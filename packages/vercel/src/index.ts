@@ -2,8 +2,8 @@
  * @aegis-sdk/vercel — Vercel AI SDK integration for Aegis.
  *
  * Provides two integration patterns:
- * 1. `createStreamTransform()` — for use with `experimental_transform` on `streamText()`
- * 2. `createModelMiddleware()` — for use with `wrapLanguageModel()`
+ * 1. `createAegisTransform()` — for use with `experimental_transform` on `streamText()`
+ * 2. `createAegisMiddleware()` — for use with `wrapLanguageModel()`
  *
  * @example
  * ```ts
@@ -24,6 +24,47 @@
 
 import type { Aegis, StreamMonitorConfig, AuditLog } from "@aegis-sdk/core";
 
+// ─── Vercel AI SDK Compatible Types ─────────────────────────────────────────
+// These are defined locally to avoid requiring `ai` as a direct dependency.
+// They mirror the types from the Vercel AI SDK (`ai` package) so that
+// `createAegisTransform()` returns a value assignable to `experimental_transform`.
+
+/**
+ * Minimal representation of a TextStreamPart from the Vercel AI SDK.
+ *
+ * The full union has many members; we only need to discriminate on `type`
+ * and extract the `textDelta` from text-bearing parts.
+ */
+interface TextStreamPartBase {
+  type: string;
+  [key: string]: unknown;
+}
+
+interface TextDeltaPart extends TextStreamPartBase {
+  type: "text-delta";
+  textDelta: string;
+}
+
+type TextStreamPart = TextStreamPartBase;
+
+/** Matches Vercel AI SDK's ToolSet = Record<string, Tool> */
+type ToolSet = Record<string, unknown>;
+
+/**
+ * The shape Vercel AI SDK expects for `experimental_transform`:
+ *
+ * ```ts
+ * (options: { tools: TOOLS; stopStream: () => void }) =>
+ *   TransformStream<TextStreamPart<TOOLS>, TextStreamPart<TOOLS>>
+ * ```
+ */
+type StreamTextTransform = (options: {
+  tools: ToolSet;
+  stopStream?: () => void;
+}) => TransformStream<TextStreamPart, TextStreamPart>;
+
+// ─── Public API ─────────────────────────────────────────────────────────────
+
 export interface AegisTransformOptions {
   /** Additional stream monitor configuration */
   monitor?: StreamMonitorConfig;
@@ -34,15 +75,133 @@ export interface AegisTransformOptions {
 /**
  * Create a stream transform compatible with Vercel AI SDK's `experimental_transform`.
  *
- * This wraps Aegis's StreamMonitor into the format expected by `streamText()`.
- * It processes `TextStreamPart` objects, scanning `text-delta` parts for
- * content violations while passing all other part types through unmodified.
+ * Returns a **function** (not a TransformStream directly) that accepts the
+ * `{ tools, stopStream }` options from the Vercel AI SDK and returns a
+ * `TransformStream<TextStreamPart, TextStreamPart>`.
+ *
+ * The transform processes `TextStreamPart` objects:
+ * - `text-delta` parts have their `textDelta` scanned by Aegis's StreamMonitor.
+ *   When a violation is detected the stream is terminated via `stopStream()` or
+ *   `controller.terminate()`.
+ * - All other part types are passed through unchanged.
+ *
+ * @example
+ * ```ts
+ * const result = streamText({
+ *   model: openai('gpt-4o'),
+ *   messages: safeMessages,
+ *   experimental_transform: createAegisTransform(aegis),
+ * });
+ * ```
  */
 export function createAegisTransform(
   aegis: Aegis,
   _options: AegisTransformOptions = {},
-): TransformStream<string, string> {
-  return aegis.createStreamTransform();
+): StreamTextTransform {
+  return ({ stopStream } = { tools: {} }) => {
+    // Create the underlying text-level TransformStream from Aegis
+    const textTransform = aegis.createStreamTransform();
+    const textWriter = textTransform.writable.getWriter();
+    const textReader = textTransform.readable.getReader();
+
+    // Track whether the text stream has been terminated
+    let terminated = false;
+
+    // Buffer for non-text parts that arrive between text chunks.
+    // We need to interleave them correctly with the text output.
+    const pendingParts: TextStreamPart[] = [];
+
+    return new TransformStream<TextStreamPart, TextStreamPart>({
+      async transform(part, controller) {
+        if (terminated) return;
+
+        if (isTextDelta(part)) {
+          // Feed the text delta into the Aegis scanner
+          try {
+            await textWriter.write(part.textDelta);
+          } catch {
+            // Writer closed — stream was terminated by Aegis
+            terminated = true;
+            if (stopStream) stopStream();
+            controller.terminate();
+            return;
+          }
+
+          // Drain any scanned text that the monitor has emitted
+          try {
+            while (true) {
+              const { value, done } = await Promise.race([
+                textReader.read(),
+                // Don't block forever — if no output yet, break out
+                new Promise<{ value: undefined; done: true }>((resolve) =>
+                  setTimeout(() => resolve({ value: undefined, done: true }), 0),
+                ),
+              ]);
+
+              if (done || value === undefined) break;
+
+              // Emit any queued non-text parts first
+              for (const pending of pendingParts) {
+                controller.enqueue(pending);
+              }
+              pendingParts.length = 0;
+
+              // Emit the scanned text as a text-delta part
+              controller.enqueue({ type: "text-delta", textDelta: value } as TextStreamPart);
+            }
+          } catch {
+            // Reader closed — stream was terminated by Aegis monitor
+            terminated = true;
+            if (stopStream) stopStream();
+            controller.terminate();
+            return;
+          }
+        } else {
+          // Non-text parts pass through unchanged
+          controller.enqueue(part);
+        }
+      },
+
+      async flush(controller) {
+        if (terminated) return;
+
+        try {
+          // Signal end-of-input to the Aegis text transform
+          await textWriter.close();
+
+          // Drain any remaining scanned text
+          while (true) {
+            const { value, done } = await textReader.read();
+            if (done || value === undefined) break;
+
+            // Flush pending non-text parts
+            for (const pending of pendingParts) {
+              controller.enqueue(pending);
+            }
+            pendingParts.length = 0;
+
+            controller.enqueue({ type: "text-delta", textDelta: value } as TextStreamPart);
+          }
+        } catch {
+          // Stream was terminated by Aegis
+          terminated = true;
+          if (stopStream) stopStream();
+          controller.terminate();
+          return;
+        }
+
+        // Flush any remaining non-text parts
+        for (const pending of pendingParts) {
+          controller.enqueue(pending);
+        }
+        pendingParts.length = 0;
+      },
+    });
+  };
+}
+
+function isTextDelta(part: TextStreamPart): part is TextDeltaPart {
+  return part.type === "text-delta" && typeof (part as TextDeltaPart).textDelta === "string";
 }
 
 /**

@@ -1,6 +1,9 @@
 import type {
   AegisConfig,
   AegisPolicy,
+  AgentLoopConfig,
+  ChainStepOptions,
+  ChainStepResult,
   GuardInputOptions,
   PromptMessage,
   RecoveryConfig,
@@ -42,7 +45,15 @@ export class Aegis {
   private audit: AuditLog;
   private validator: ActionValidator;
   private recovery: RecoveryConfig;
+  private agentLoopConfig: AgentLoopConfig;
   private sessionQuarantined = false;
+
+  /** Default privilege decay schedule */
+  private static readonly DEFAULT_PRIVILEGE_DECAY: Record<number, number> = {
+    10: 0.75,
+    15: 0.5,
+    20: 0.25,
+  };
 
   constructor(config: AegisConfig = {}) {
     this.policy = resolvePolicy(config.policy ?? "balanced");
@@ -56,8 +67,14 @@ export class Aegis {
       ...config.monitor,
     });
     this.audit = new AuditLog(config.audit);
-    this.validator = new ActionValidator(this.policy);
+    this.validator = new ActionValidator(this.policy, config.validator);
     this.recovery = config.recovery ?? { mode: "continue" };
+    this.agentLoopConfig = config.agentLoop ?? {};
+
+    // Wire the validator's audit callback to our AuditLog
+    this.validator.setAuditCallback((entry) => {
+      this.audit.log(entry);
+    });
   }
 
   /**
@@ -214,6 +231,218 @@ export class Aegis {
    */
   getPolicy(): AegisPolicy {
     return this.policy;
+  }
+
+  /**
+   * Guard a single step in an agentic loop.
+   *
+   * This method provides multi-layer protection for agentic systems where
+   * the model iterates through multiple tool-calling steps:
+   *
+   * 1. **Quarantine** the model output with source "model_output"
+   * 2. **Scan** the output for injection payloads (T14 chain injection)
+   * 3. **Track cumulative risk** across steps — halt if budget exceeded
+   * 4. **Enforce step budget** — halt if max steps reached
+   * 5. **Apply privilege decay** — progressively restrict available tools
+   * 6. **Audit** every step with event "chain_step_scan"
+   *
+   * @param output - The raw model output text to scan
+   * @param options - Chain step configuration
+   * @returns ChainStepResult with safety verdict and updated state
+   *
+   * @example
+   * ```ts
+   * let cumulativeRisk = 0;
+   * for (let step = 1; step <= 25; step++) {
+   *   const modelOutput = await callModel();
+   *   const result = await aegis.guardChainStep(modelOutput, {
+   *     step,
+   *     cumulativeRisk,
+   *     initialTools: ['read_file', 'write_file', 'search'],
+   *   });
+   *   if (!result.safe) break;
+   *   cumulativeRisk = result.cumulativeRisk;
+   *   // Only allow result.availableTools for the next step
+   * }
+   * ```
+   */
+  async guardChainStep(output: string, options: ChainStepOptions): Promise<ChainStepResult> {
+    const maxSteps = options.maxSteps ?? this.agentLoopConfig.defaultMaxSteps ?? 25;
+    const riskBudget = options.riskBudget ?? this.agentLoopConfig.defaultRiskBudget ?? 3.0;
+    const previousRisk = options.cumulativeRisk ?? 0;
+    const initialTools = options.initialTools ?? [];
+
+    // Step 1: Check step budget
+    if (options.step > maxSteps) {
+      const budgetResult = this.buildChainStepBlockedResult(
+        `Step budget exhausted: step ${options.step} exceeds maximum ${maxSteps}`,
+        previousRisk,
+        initialTools,
+        true,
+      );
+      this.audit.log({
+        event: "chain_step_scan",
+        decision: "blocked",
+        sessionId: options.sessionId,
+        requestId: options.requestId,
+        context: {
+          step: options.step,
+          maxSteps,
+          reason: budgetResult.reason,
+          budgetExhausted: true,
+        },
+      });
+      return budgetResult;
+    }
+
+    // Step 2: Quarantine the model output and scan it
+    const quarantined = quarantine(output, { source: "model_output" });
+    const scanResult = this.scanner.scan(quarantined);
+
+    // Step 3: Calculate cumulative risk
+    const newCumulativeRisk = previousRisk + scanResult.score;
+
+    // Step 4: Check risk budget
+    if (newCumulativeRisk >= riskBudget) {
+      this.audit.log({
+        event: "chain_step_scan",
+        decision: "blocked",
+        sessionId: options.sessionId,
+        requestId: options.requestId,
+        context: {
+          step: options.step,
+          maxSteps,
+          score: scanResult.score,
+          cumulativeRisk: newCumulativeRisk,
+          riskBudget,
+          detections: scanResult.detections.length,
+          reason: "Risk budget exceeded",
+        },
+      });
+      return {
+        safe: false,
+        reason: `Cumulative risk budget exceeded: ${newCumulativeRisk.toFixed(2)} >= ${riskBudget} (this step: ${scanResult.score.toFixed(2)})`,
+        cumulativeRisk: newCumulativeRisk,
+        scanResult,
+        availableTools: this.applyPrivilegeDecay(initialTools, options.step),
+        budgetExhausted: false,
+      };
+    }
+
+    // Step 5: Block if this individual step was unsafe
+    if (!scanResult.safe) {
+      this.audit.log({
+        event: "chain_step_scan",
+        decision: "blocked",
+        sessionId: options.sessionId,
+        requestId: options.requestId,
+        context: {
+          step: options.step,
+          maxSteps,
+          score: scanResult.score,
+          cumulativeRisk: newCumulativeRisk,
+          detections: scanResult.detections.map((d) => ({
+            type: d.type,
+            severity: d.severity,
+          })),
+          reason: "Injection detected in model output",
+        },
+      });
+      return {
+        safe: false,
+        reason: `Injection detected in model output at step ${options.step}: ${scanResult.detections.length} detection(s), score ${scanResult.score.toFixed(2)}`,
+        cumulativeRisk: newCumulativeRisk,
+        scanResult,
+        availableTools: this.applyPrivilegeDecay(initialTools, options.step),
+        budgetExhausted: false,
+      };
+    }
+
+    // Step 6: Apply privilege decay
+    const availableTools = this.applyPrivilegeDecay(initialTools, options.step);
+
+    // Step 7: Audit the successful step
+    this.audit.log({
+      event: "chain_step_scan",
+      decision: scanResult.detections.length > 0 ? "flagged" : "allowed",
+      sessionId: options.sessionId,
+      requestId: options.requestId,
+      context: {
+        step: options.step,
+        maxSteps,
+        score: scanResult.score,
+        cumulativeRisk: newCumulativeRisk,
+        riskBudget,
+        detections: scanResult.detections.length,
+        availableToolCount: availableTools.length,
+        totalToolCount: initialTools.length,
+      },
+    });
+
+    return {
+      safe: true,
+      reason: `Step ${options.step}/${maxSteps} passed (score: ${scanResult.score.toFixed(2)}, cumulative: ${newCumulativeRisk.toFixed(2)}/${riskBudget})`,
+      cumulativeRisk: newCumulativeRisk,
+      scanResult,
+      availableTools,
+      budgetExhausted: false,
+    };
+  }
+
+  /**
+   * Apply privilege decay based on current step.
+   *
+   * As the loop progresses, fewer tools remain available. This limits
+   * the blast radius of a compromised agentic loop in later steps.
+   */
+  private applyPrivilegeDecay(initialTools: string[], step: number): string[] {
+    if (initialTools.length === 0) return [];
+
+    const decaySchedule = this.agentLoopConfig.privilegeDecay ?? Aegis.DEFAULT_PRIVILEGE_DECAY;
+
+    // Find the applicable decay fraction for this step
+    let fraction = 1.0;
+    const thresholds = Object.keys(decaySchedule)
+      .map(Number)
+      .sort((a, b) => a - b);
+
+    for (const threshold of thresholds) {
+      if (step >= threshold) {
+        fraction = decaySchedule[threshold] ?? fraction;
+      }
+    }
+
+    if (fraction >= 1.0) return [...initialTools];
+
+    // Reduce available tools: keep the first N tools (preserving order/priority)
+    const count = Math.max(1, Math.floor(initialTools.length * fraction));
+    return initialTools.slice(0, count);
+  }
+
+  /**
+   * Build a blocked ChainStepResult with an empty scan result.
+   */
+  private buildChainStepBlockedResult(
+    reason: string,
+    cumulativeRisk: number,
+    availableTools: string[],
+    budgetExhausted: boolean,
+  ): ChainStepResult {
+    return {
+      safe: false,
+      reason,
+      cumulativeRisk,
+      scanResult: {
+        safe: false,
+        score: 0,
+        detections: [],
+        normalized: "",
+        language: { primary: "unknown", switches: [] },
+        entropy: { mean: 0, maxWindow: 0, anomalous: false },
+      },
+      availableTools,
+      budgetExhausted,
+    };
   }
 
   private getMessagesToScan(messages: PromptMessage[], strategy: string): PromptMessage[] {

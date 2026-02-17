@@ -1,7 +1,7 @@
 {
-  "name": "@aegis-sdk/core",
+  "name": "@aegis-sdk/next",
   "version": "0.2.0",
-  "description": "Streaming-first prompt injection defense for AI applications",
+  "description": "Next.js integration for Aegis prompt injection defense",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -20,8 +20,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "patterns"
+    "dist"
   ],
   "scripts": {
     "build": "tsup",
@@ -29,22 +28,17 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
-  "keywords": [
-    "ai",
-    "llm",
-    "prompt-injection",
-    "security",
-    "streaming",
-    "defense",
-    "guard",
-    "openai",
-    "anthropic",
-    "vercel-ai"
-  ],
+  "peerDependencies": {
+    "@aegis-sdk/core": "workspace:*",
+    "next": ">=13.0.0"
+  },
+  "dependencies": {
+    "@aegis-sdk/core": "workspace:*"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/aegis-sdk/aegis",
-    "directory": "packages/core"
+    "directory": "packages/next"
   },
   "engines": {
     "node": ">=18.0.0"

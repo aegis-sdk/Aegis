@@ -57,17 +57,50 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
     severity: "high",
     description: "Attempts to reassign the model's role",
   },
+  // "pretend you are / to be / you're" followed by suspicious role targets
+  // (jailbreak-related: "unrestricted", "without rules", "evil", "DAN", etc.)
+  // are critical. General-purpose roleplay ("pretend you're a pirate") is medium.
+  {
+    type: "role_manipulation",
+    pattern:
+      /pretend\s+(you\s+are|to\s+be|you're)\s+(an?\s+)?(unrestricted|unfiltered|evil|DAN|jailbr(oken|eak)|uncensored|unaligned|AI\b)/i,
+    severity: "critical",
+    description: "Attempts to make model pretend to be an unrestricted persona",
+  },
+  {
+    type: "role_manipulation",
+    pattern:
+      /pretend\s+(you\s+are|to\s+be|you're)\b.*(?:no\s+(?:safety|content\s+)?(?:features?|filters?|restrictions?|guardrails?|rules?|limits?)|without\s+(?:any\s+)?(?:rules?|restrictions?|guardrails?|limits?|safety))/i,
+    severity: "critical",
+    description: "Attempts to make model pretend to have no restrictions",
+  },
   {
     type: "role_manipulation",
     pattern: /pretend\s+(you\s+are|to\s+be|you're)\s/i,
-    severity: "high",
-    description: "Attempts to make model pretend to be something else",
+    severity: "medium",
+    description: "Role-play request (benign in creative/educational contexts)",
+  },
+  // "act as [if you are | a/an | the]" followed by suspicious targets is critical.
+  // General "act as a [role]" for creative/educational is medium.
+  {
+    type: "role_manipulation",
+    pattern:
+      /act\s+as\s+(if\s+you\s+are\s+)?(an?\s+)?(unrestricted|unfiltered|evil|DAN|jailbr(oken|eak)|uncensored|unaligned|terminal|shell|command\s+line|console)/i,
+    severity: "critical",
+    description: "Attempts to make model act as an unrestricted entity or terminal",
+  },
+  {
+    type: "role_manipulation",
+    pattern:
+      /act\s+as\s+(if\s+you\s+are\s+)?.*(?:no\s+(?:safety|content\s+)?(?:features?|filters?|restrictions?|guardrails?|rules?|limits?)|without\s+(?:any\s+)?(?:rules?|restrictions?|guardrails?|limits?|safety))/i,
+    severity: "critical",
+    description: "Attempts to make model act without restrictions",
   },
   {
     type: "role_manipulation",
     pattern: /act\s+as\s+(if\s+you\s+are|an?|the)\s/i,
-    severity: "high",
-    description: "Attempts to make model act as another entity",
+    severity: "medium",
+    description: "Role-play request (benign in creative/educational contexts)",
   },
   {
     type: "role_manipulation",
@@ -317,10 +350,13 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
     severity: "critical",
     description: "Request to grant administrative access",
   },
+  // "bypass auth" is only critical when it's a directive (imperative/instruction).
+  // Questions like "How to bypass authentication for X?" are educational/technical.
+  // We use a negative lookbehind for question-context starters.
   {
     type: "privilege_escalation",
     pattern:
-      /bypass\s+(?:the\s+)?(?:authentication|authorization|access\s+control|permissions?|security|verification)/i,
+      /(?<!how\s+(?:to|do\s+I|can\s+I|would\s+I|should\s+I)\s)bypass\s+(?:the\s+)?(?:authentication|authorization|access\s+control|permissions?|security|verification)/i,
     severity: "critical",
     description: "Attempt to bypass authentication or authorization",
   },
@@ -534,10 +570,15 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
     severity: "low",
     description: "Mixed Latin and CJK scripts detected (may be normal bilingual text)",
   },
+  // Interleaved Latin/Cyrillic within a word.
+  // After homoglyph normalization, legitimate Cyrillic text can have some Latin
+  // characters injected (e.g. Cyrillic а → Latin a). Require a longer run of
+  // interleaving (at least 5 alternating chars) to reduce false positives on
+  // bilingual tech text that goes through normalization.
   {
     type: "language_switching",
     pattern:
-      /[\u0400-\u04FF][\u0041-\u005A\u0061-\u007A][\u0400-\u04FF]|[\u0041-\u005A\u0061-\u007A][\u0400-\u04FF][\u0041-\u005A\u0061-\u007A]/,
+      /(?:[\u0400-\u04FF][\u0041-\u005A\u0061-\u007A]){2,}[\u0400-\u04FF]?|(?:[\u0041-\u005A\u0061-\u007A][\u0400-\u04FF]){2,}[\u0041-\u005A\u0061-\u007A]?/,
     severity: "high",
     description:
       "Interleaved Latin and Cyrillic characters within a word (homoglyph attack indicator)",

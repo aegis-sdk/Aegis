@@ -210,12 +210,117 @@ export interface ActionValidationRequest {
     tool: string;
     params: Record<string, unknown>;
   };
+  /** Optional: the tool output data from the previous step, used for exfiltration tracking */
+  previousToolOutput?: string;
 }
 
 export interface ActionValidationResult {
   allowed: boolean;
   reason: string;
   requiresApproval: boolean;
+  /** Set when the action was paused for human approval */
+  awaitedApproval?: boolean;
+}
+
+export interface ActionValidatorConfig {
+  /**
+   * Callback invoked when a tool requires human-in-the-loop approval.
+   * Should return true to approve, false to deny.
+   */
+  onApprovalNeeded?: (request: ActionValidationRequest) => Promise<boolean>;
+
+  /**
+   * When enabled, the InputScanner's pattern matching is run against
+   * all string values in tool parameters. This catches injection payloads
+   * hidden in MCP tool parameters.
+   */
+  scanMcpParams?: boolean;
+
+  /**
+   * InputScanner configuration to use when scanMcpParams is enabled.
+   * Falls back to balanced defaults if not provided.
+   */
+  scannerConfig?: InputScannerConfig;
+
+  /**
+   * Denial-of-wallet detection configuration.
+   * Tracks cumulative cost of expensive operations and enforces thresholds.
+   */
+  denialOfWallet?: DenialOfWalletConfig;
+
+  /**
+   * Destinations considered "external" for data exfiltration prevention.
+   * When noExfiltration is enabled in the policy, actions that would transmit
+   * previously-read data to these tool patterns are blocked.
+   * Defaults to common external-facing tools if not specified.
+   */
+  exfiltrationToolPatterns?: string[];
+}
+
+export interface DenialOfWalletConfig {
+  /** Maximum total operations allowed within the window. Default: 100 */
+  maxOperations?: number;
+  /** Time window for tracking operations, e.g. "5m", "1h". Default: "5m" */
+  window?: string;
+  /** Maximum sandbox triggers within the window. Default: 10 */
+  maxSandboxTriggers?: number;
+  /** Maximum total tool calls within the window. Default: 50 */
+  maxToolCalls?: number;
+}
+
+// ─── Agent Loop / Chain Step ─────────────────────────────────────────────────
+
+export interface ChainStepOptions {
+  /** Maximum number of steps before the loop is halted. Default: 25 */
+  maxSteps?: number;
+  /** Current step number (1-based). Required. */
+  step: number;
+  /** Session ID for audit correlation */
+  sessionId?: string;
+  /** Request ID for audit correlation */
+  requestId?: string;
+  /**
+   * Privilege decay: the full list of tools available at step 1.
+   * Tools will be progressively restricted as steps increase.
+   */
+  initialTools?: string[];
+  /**
+   * Cumulative risk score from previous steps.
+   * guardChainStep() will add to this and return it in the result.
+   */
+  cumulativeRisk?: number;
+  /** Risk threshold at which the chain is halted. Default: 3.0 */
+  riskBudget?: number;
+}
+
+export interface ChainStepResult {
+  /** Whether this step should be allowed to proceed */
+  safe: boolean;
+  /** Reason for the decision */
+  reason: string;
+  /** Updated cumulative risk score including this step */
+  cumulativeRisk: number;
+  /** The scan result from analyzing the model output */
+  scanResult: ScanResult;
+  /** Tools still available after privilege decay for this step */
+  availableTools: string[];
+  /** Whether the step budget has been exhausted */
+  budgetExhausted: boolean;
+}
+
+export interface AgentLoopConfig {
+  /** Default maximum steps for guardChainStep(). Default: 25 */
+  defaultMaxSteps?: number;
+  /** Default risk budget before halting. Default: 3.0 */
+  defaultRiskBudget?: number;
+  /**
+   * Privilege decay schedule. Maps step thresholds to the fraction
+   * of tools that remain available (0-1). For example:
+   * { 10: 0.75, 20: 0.5 } means at step 10, 75% of tools remain;
+   * at step 20, 50% remain.
+   * Default: { 10: 0.75, 15: 0.5, 20: 0.25 }
+   */
+  privilegeDecay?: Record<number, number>;
 }
 
 // ─── Stream Monitor ──────────────────────────────────────────────────────────
@@ -223,6 +328,8 @@ export interface ActionValidationResult {
 export interface StreamMonitorConfig {
   canaryTokens?: string[];
   detectPII?: boolean;
+  /** When true AND detectPII is true, redact PII instead of blocking the stream */
+  piiRedaction?: boolean;
   detectSecrets?: boolean;
   detectInjectionPayloads?: boolean;
   sanitizeMarkdown?: boolean;
@@ -329,6 +436,8 @@ export interface AegisConfig {
   recovery?: RecoveryConfig;
   audit?: AuditLogConfig;
   canaryTokens?: string[];
+  validator?: ActionValidatorConfig;
+  agentLoop?: AgentLoopConfig;
 }
 
 export interface RecoveryConfig {

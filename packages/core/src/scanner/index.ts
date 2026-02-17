@@ -104,19 +104,31 @@ export class InputScanner {
     }
 
     // Step 7: Language/script detection
+    // IMPORTANT: Run language detection on the RAW text (before normalization).
+    // Homoglyph normalization converts Cyrillic а→a, о→o, etc., which creates
+    // artificial script switches within what were originally pure-Cyrillic words.
+    // Pattern-matching for actual homoglyph attacks still uses the normalized text.
     const language = this.config.languageDetection
-      ? detectLanguageSwitches(normalized)
+      ? detectLanguageSwitches(raw)
       : { primary: "unknown", switches: [] };
 
-    if (this.config.languageDetection && language.switches.length >= 3) {
-      detections.push({
-        type: "language_switching",
-        pattern: "excessive_script_switches",
-        matched: `${language.switches.length} script switches detected`,
-        severity: language.switches.length >= 5 ? "high" : "medium",
-        position: { start: 0, end: normalized.length },
-        description: `Suspicious language switching: ${language.switches.length} script changes (${language.switches.map((s) => `${s.from}→${s.to}`).join(", ")})`,
-      });
+    // Script-switch detection: bilingual tech text (e.g. "unit-тест на Python")
+    // naturally has several switches between Latin (programming terms) and the
+    // primary script. Use a density-based approach: switches per 100 characters.
+    if (this.config.languageDetection && language.switches.length >= 5) {
+      // Calculate switch density: switches per 100 characters
+      const switchDensity = (language.switches.length / Math.max(raw.length, 1)) * 100;
+      // Only flag when density is high (> 15 per 100 chars) OR absolute count is very high
+      if (switchDensity > 15 || language.switches.length >= 15) {
+        detections.push({
+          type: "language_switching",
+          pattern: "excessive_script_switches",
+          matched: `${language.switches.length} script switches detected`,
+          severity: language.switches.length >= 15 && switchDensity > 20 ? "high" : "medium",
+          position: { start: 0, end: normalized.length },
+          description: `Suspicious language switching: ${language.switches.length} script changes (density: ${switchDensity.toFixed(1)}/100chars)`,
+        });
+      }
     }
 
     // Calculate composite score

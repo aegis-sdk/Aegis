@@ -13,7 +13,7 @@ export { InputScanner } from "./scanner/index.js";
 export { PromptBuilder } from "./builder/index.js";
 export { StreamMonitor } from "./monitor/index.js";
 export { AuditLog } from "./audit/index.js";
-export { ActionValidator } from "./validator/index.js";
+export { ActionValidator, parseWindow } from "./validator/index.js";
 export { Sandbox } from "./sandbox/index.js";
 
 // ─── Policy ──────────────────────────────────────────────────────────────────
@@ -59,6 +59,13 @@ export type {
   // Action Validator
   ActionValidationRequest,
   ActionValidationResult,
+  ActionValidatorConfig,
+  DenialOfWalletConfig,
+
+  // Agent Loop / Chain Step
+  ChainStepOptions,
+  ChainStepResult,
+  AgentLoopConfig,
 
   // Stream Monitor
   StreamMonitorConfig,

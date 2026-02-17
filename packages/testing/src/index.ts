@@ -25,4 +25,9 @@ export {
   type AttackSuite,
   type AttackPayload,
 } from "./suites/index.js";
-export { PayloadGenerator } from "./generators/index.js";
+export {
+  PayloadGenerator,
+  generateFuzzPayloads,
+  type GenerateFuzzPayloadsOptions,
+  type FuzzEncoding,
+} from "./generators/index.js";
