@@ -6,7 +6,7 @@
 **Author:** Josh + Claude
 **Date:** February 17, 2026
 **Status:** Pre-Development / Architecture Locked
-**Package Scope:** `@aegis-ai/core`
+**Package Scope:** `@aegis-sdk/core`
 
 ---
 
@@ -46,7 +46,7 @@ Despite this being a known, critical problem, the JavaScript/TypeScript ecosyste
 
 But the problem is worse than that. Even the Python tools that exist are built for a **request/response world**, while modern AI is **streaming-first**. Developers today face a binary choice: **Fast & Insecure** (stream raw tokens immediately) or **Slow & Secure** (buffer the full response to scan it, adding 2-10s of latency). Nobody chooses slow.
 
-**Aegis.js** (`@aegis-ai/core`) is the first **Optimistic Defense** library for the JavaScript/TypeScript ecosystem. It brings defense-in-depth to every JS developer building with LLMs, while solving the streaming problem that makes existing tools useless in practice. It decouples delivery from analysis — streaming tokens instantly while analyzing content in parallel, using a "Kill Switch" architecture to abort streams the moment a violation is detected.
+**Aegis.js** (`@aegis-sdk/core`) is the first **Optimistic Defense** library for the JavaScript/TypeScript ecosystem. It brings defense-in-depth to every JS developer building with LLMs, while solving the streaming problem that makes existing tools useless in practice. It decouples delivery from analysis — streaming tokens instantly while analyzing content in parallel, using a "Kill Switch" architecture to abort streams the moment a violation is detected.
 
 The library applies proven security patterns from decades of software security history (taint tracking, capability-based security, CSP, sandboxing, prepared statements) and translates them into a modern, ergonomic API that works with the tools developers actually use: **Next.js**, **Vercel AI SDK**, and **LangChain**.
 
@@ -57,12 +57,12 @@ The library applies proven security patterns from decades of software security h
 ## 2. Naming & Package Identity
 
 **Selected Name:** **Aegis**
-**Package Name:** `@aegis-ai/core`
-**CLI Package:** `@aegis-ai/cli`
+**Package Name:** `@aegis-sdk/core`
+**CLI Package:** `@aegis-sdk/cli`
 
-*Rationale:* "Aegis" — the shield of Zeus and Athena. "Under the aegis of" = "under the protection of." The scoped `@aegis-ai` namespace avoids npm squatting conflicts and gives us clean room for the full package ecosystem.
+*Rationale:* "Aegis" — the shield of Zeus and Athena. "Under the aegis of" = "under the protection of." The scoped `@aegis-sdk` namespace avoids npm squatting conflicts and gives us clean room for the full package ecosystem.
 
-### Backup Names (if `@aegis-ai` is unavailable)
+### Backup Names (if `@aegis-sdk` is unavailable)
 
 | Name         | Connotation                        | Notes                                  |
 | ------------ | ---------------------------------- | -------------------------------------- |
@@ -697,7 +697,7 @@ const raw = input.unsafeUnwrap({
 // ⚠️  unsafeUnwrap() Guardrails (preventing misuse):
 // 1. REQUIRED: 'reason' field is mandatory — forces developers to document why
 // 2. AUDIT: Every unsafeUnwrap() call creates an audit entry by default
-// 3. LINT: @aegis-ai/eslint-plugin flags unsafeUnwrap() in new code
+// 3. LINT: @aegis-sdk/eslint-plugin flags unsafeUnwrap() in new code
 //    (rule: "aegis/no-unsafe-unwrap" — warn by default, error in strict mode)
 // 4. PRODUCTION WARNING: In production (NODE_ENV=production), unsafeUnwrap()
 //    emits a console.warn on first use and increments a counter in audit log
@@ -1267,8 +1267,8 @@ const violations = await audit.query({
 Many enterprises use OpenTelemetry for observability. Aegis provides a first-class OTel exporter so security events flow into existing monitoring infrastructure:
 
 ```typescript
-import { AuditLog } from '@aegis-ai/core';
-import { OTelTransport } from '@aegis-ai/core/audit/otel';
+import { AuditLog } from '@aegis-sdk/core';
+import { OTelTransport } from '@aegis-sdk/core/audit/otel';
 
 const audit = new AuditLog({
   transport: new OTelTransport({
@@ -1357,7 +1357,7 @@ aegis.configure({
     // - API keys or secrets
     // - Conversation history
     // - IP addresses
-    endpoint: 'https://telemetry.aegis-ai.dev/v1/report',
+    endpoint: 'https://telemetry.aegis-sdk.dev/v1/report',
     frequency: 'daily',  // Batch and send once per day
   },
 });
@@ -1428,7 +1428,7 @@ For developers using Next.js with the Vercel AI SDK — the most common pattern 
 // app/api/chat/route.ts
 import { streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis({ policy: 'strict' });
 
@@ -1461,7 +1461,7 @@ For developers who want Aegis protection baked into the model itself:
 ```typescript
 import { streamText, wrapLanguageModel } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis({ policy: 'strict' });
 
@@ -1506,7 +1506,7 @@ When `messageIntegrity.enabled` is true and `scanStrategy` is `full-history`, as
 For developers who want maximum protection with minimum code:
 
 ```typescript
-import { aegis } from '@aegis-ai/core';
+import { aegis } from '@aegis-sdk/core';
 
 // Configure once at app startup
 aegis.configure({
@@ -1539,7 +1539,7 @@ import {
   quarantine, InputScanner, PromptBuilder,
   Policy, ActionValidator, Sandbox, AuditLog,
   StreamMonitor
-} from '@aegis-ai/core';
+} from '@aegis-sdk/core';
 
 // Use individual modules
 const input = quarantine(req.body.message, { source: 'user_input' });
@@ -1563,7 +1563,7 @@ const prompt = new PromptBuilder()
 For developers who already have AI code and want to add protection without rewriting:
 
 ```typescript
-import { protect } from '@aegis-ai/core';
+import { protect } from '@aegis-sdk/core';
 
 // Wrap your existing function
 const safeChat = protect(myExistingChatFunction, {
@@ -1581,7 +1581,7 @@ const response = await safeChat(userMessage, systemPrompt);
 For manual, one-off assessments:
 
 ```typescript
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis();
 
@@ -1600,7 +1600,7 @@ const cleanData = await aegis.sandbox(userInput, schema);
 For developers building agentic workflows where model outputs feed back as inputs:
 
 ```typescript
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis({
   agentLoop: {
@@ -1666,19 +1666,19 @@ interface ProviderAdapter {
 
 | Target | Package | Priority | Notes |
 | :--- | :--- | :--- | :--- |
-| **Vercel AI SDK (`ai`)** | `@aegis-ai/vercel` | **P0** | Covers OpenAI, Anthropic, Mistral, etc. for Next.js users |
-| **LangChain.js** | `@aegis-ai/langchain` | **P1** | For agentic workflows |
-| Direct Anthropic SDK | `@aegis-ai/anthropic` | P2 | Backend scripts not using frameworks |
-| Direct OpenAI SDK | `@aegis-ai/openai` | P2 | Backend scripts not using frameworks |
-| Google (Gemini) | `@aegis-ai/google` | P3 | |
-| Mistral | `@aegis-ai/mistral` | P3 | |
-| Ollama (local models) | `@aegis-ai/ollama` | P3 | |
-| Custom/Generic | `@aegis-ai/core` (built-in) | P0 | Always available |
+| **Vercel AI SDK (`ai`)** | `@aegis-sdk/vercel` | **P0** | Covers OpenAI, Anthropic, Mistral, etc. for Next.js users |
+| **LangChain.js** | `@aegis-sdk/langchain` | **P1** | For agentic workflows |
+| Direct Anthropic SDK | `@aegis-sdk/anthropic` | P2 | Backend scripts not using frameworks |
+| Direct OpenAI SDK | `@aegis-sdk/openai` | P2 | Backend scripts not using frameworks |
+| Google (Gemini) | `@aegis-sdk/google` | P3 | |
+| Mistral | `@aegis-sdk/mistral` | P3 | |
+| Ollama (local models) | `@aegis-sdk/ollama` | P3 | |
+| Custom/Generic | `@aegis-sdk/core` (built-in) | P0 | Always available |
 
 ### 11.4 Bring Your Own Provider
 
 ```typescript
-import { createAdapter } from '@aegis-ai/core';
+import { createAdapter } from '@aegis-sdk/core';
 
 const myAdapter = createAdapter({
   name: 'my-custom-llm',
@@ -1703,7 +1703,7 @@ Aegis must run on Edge Runtimes (Cloudflare Workers / Vercel Edge).
 ### 12.2 Express/Node Middleware
 
 ```typescript
-import { aegisMiddleware } from '@aegis-ai/express';
+import { aegisMiddleware } from '@aegis-sdk/express';
 
 // Auto-quarantine all incoming request data
 app.use(aegisMiddleware({
@@ -1722,12 +1722,12 @@ app.post('/chat', async (req, res) => {
 
 | Framework | Package | Priority |
 | :--- | :--- | :--- |
-| Express | `@aegis-ai/express` | v0.1 |
-| Hono | `@aegis-ai/hono` | v0.2 |
-| Fastify | `@aegis-ai/fastify` | v0.2 |
-| Next.js (API routes) | `@aegis-ai/next` | v0.1 |
-| SvelteKit (actions/load) | `@aegis-ai/sveltekit` | v0.2 |
-| Koa | `@aegis-ai/koa` | v0.3 |
+| Express | `@aegis-sdk/express` | v0.1 |
+| Hono | `@aegis-sdk/hono` | v0.2 |
+| Fastify | `@aegis-sdk/fastify` | v0.2 |
+| Next.js (API routes) | `@aegis-sdk/next` | v0.1 |
+| SvelteKit (actions/load) | `@aegis-sdk/sveltekit` | v0.2 |
+| Koa | `@aegis-sdk/koa` | v0.3 |
 
 ---
 
@@ -1849,7 +1849,7 @@ telemetry:
 ### 13.3 Preset Policies
 
 ```typescript
-import { presets } from '@aegis-ai/core';
+import { presets } from '@aegis-sdk/core';
 
 const policy = presets.customerSupport();  // Tuned for support bots
 const policy = presets.codeAssistant();    // Tuned for code generation
@@ -1868,7 +1868,7 @@ Aegis includes built-in tools for testing your defenses.
 ### 14.1 Red Team Scanner
 
 ```typescript
-import { redTeam } from '@aegis-ai/testing';
+import { redTeam } from '@aegis-sdk/testing';
 
 const results = await redTeam.scan({
   target: myAegisConfig,
@@ -1978,7 +1978,7 @@ This creates a virtuous cycle: **Every successful attack makes Aegis stronger.**
 
 **The triage process:**
 
-1. **Bypass PRs are submitted to a private fork first.** Contributors open PRs against `aegis-ai/aegis-security` (a private repo), not the public repo.
+1. **Bypass PRs are submitted to a private fork first.** Contributors open PRs against `aegis-sdk/aegis-security` (a private repo), not the public repo.
 2. **Maintainers validate the bypass** — confirm it's a real bypass, not a configuration error or known issue.
 3. **A patch is developed** in the same private repo. The bypass test and the fix are landed together.
 4. **Coordinated disclosure:** The bypass test, fix, and HALL_OF_FAME update are merged to the public repo simultaneously. A new version is published to npm.
@@ -2235,7 +2235,7 @@ When conversation history is managed client-side (e.g., Vercel AI SDK's `useChat
 **Message Signing (Recommended for high-security applications):**
 
 ```typescript
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis({
   messageIntegrity: {
@@ -2348,15 +2348,15 @@ aegis/
 
 | Package | Description |
 | :--- | :--- |
-| `@aegis-ai/core` | Core library — all modules, zero provider dependencies |
-| `@aegis-ai/vercel` | Vercel AI SDK integration (P0) |
-| `@aegis-ai/langchain` | LangChain.js integration |
-| `@aegis-ai/anthropic` | Anthropic Claude adapter |
-| `@aegis-ai/openai` | OpenAI adapter |
-| `@aegis-ai/express` | Express middleware |
-| `@aegis-ai/next` | Next.js integration |
-| `@aegis-ai/testing` | Red team & testing tools |
-| `@aegis-ai/cli` | CLI tool for policy validation & testing |
+| `@aegis-sdk/core` | Core library — all modules, zero provider dependencies |
+| `@aegis-sdk/vercel` | Vercel AI SDK integration (P0) |
+| `@aegis-sdk/langchain` | LangChain.js integration |
+| `@aegis-sdk/anthropic` | Anthropic Claude adapter |
+| `@aegis-sdk/openai` | OpenAI adapter |
+| `@aegis-sdk/express` | Express middleware |
+| `@aegis-sdk/next` | Next.js integration |
+| `@aegis-sdk/testing` | Red team & testing tools |
+| `@aegis-sdk/cli` | CLI tool for policy validation & testing |
 
 ---
 
@@ -2399,7 +2399,7 @@ aegis/
 - [ ] Benign corpus (5,000 queries from sourcing plan) + false positive CI gate (<0.1%)
 - [ ] Next.js example project (chatbot with streaming protection)
 - [ ] Getting Started documentation
-- [ ] npm publish: `@aegis-ai/core`, `@aegis-ai/vercel`
+- [ ] npm publish: `@aegis-sdk/core`, `@aegis-sdk/vercel`
 
 ### Phase 2: Action Safety & Ecosystem (Weeks 10-13) — v0.2.0
 
@@ -2416,7 +2416,7 @@ aegis/
 - [ ] Template-based fuzzing with `fast-check` in CI
 - [ ] Pattern DB auto-sync script with integrity verification (Promptfoo, OWASP, PyRIT, MITRE ATLAS)
 - [ ] MCP server integration guide
-- [ ] npm publish: `@aegis-ai/langchain`, `@aegis-ai/express`, `@aegis-ai/anthropic`, `@aegis-ai/openai`
+- [ ] npm publish: `@aegis-sdk/langchain`, `@aegis-sdk/express`, `@aegis-sdk/anthropic`, `@aegis-sdk/openai`
 
 ### Phase 3: Testing & Intelligence (Weeks 14-17) — v0.3.0
 
@@ -2435,7 +2435,7 @@ aegis/
 - [ ] Custom transport for audit logging
 - [ ] Promptfoo compatibility layer
 - [ ] Documentation site (VitePress or Starlight)
-- [ ] npm publish: `@aegis-ai/testing`, `@aegis-ai/cli`, `@aegis-ai/sveltekit`, `@aegis-ai/hono`
+- [ ] npm publish: `@aegis-sdk/testing`, `@aegis-sdk/cli`, `@aegis-sdk/sveltekit`, `@aegis-sdk/hono`
 
 ### Phase 4: Advanced (Weeks 18-23) — v0.4.0
 
@@ -2524,7 +2524,7 @@ aegis/
 
 These need resolution before or during Phase 1:
 
-1. **Package name verification.** Confirm `@aegis-ai/core` is available on npm and `aegis-ai` org can be claimed on GitHub.
+1. **Package name verification.** ~~Confirm `@aegis-sdk/core` is available on npm and `aegis-sdk` org can be claimed on GitHub.~~ **RESOLVED:** Both are available as of 2026-02-17.
 
 2. **License.** MIT (maximum adoption) vs Apache 2.0 (patent protection) vs AGPL (copyleft). Recommendation: MIT for maximum adoption.
 
@@ -2547,7 +2547,7 @@ These need resolution before or during Phase 1:
 
 10. **Fail Open default for sandbox.** Is it correct that when the sandbox model is unreachable, we should default to allowing the request through (with logging)? Or should this be configurable per deployment?
 
-11. **Perplexity model bundling.** The perplexity estimator requires a lightweight language model (~500KB). Should it be bundled in core (increases bundle size but works offline) or distributed as a separate `@aegis-ai/perplexity` package? Edge Runtime compatibility is a concern.
+11. **Perplexity model bundling.** The perplexity estimator requires a lightweight language model (~500KB). Should it be bundled in core (increases bundle size but works offline) or distributed as a separate `@aegis-sdk/perplexity` package? Edge Runtime compatibility is a concern.
 
 12. **Message integrity storage.** HMAC-based message signing requires the server to verify signatures on subsequent requests. For stateless API routes (common in Next.js), where should the HMAC secret live? Environment variable (simplest), per-session key (more secure), or external store (Redis)?
 

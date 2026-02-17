@@ -12,7 +12,7 @@
 Aegis protects your LLM-powered apps against prompt injection, data leakage, and unauthorized actions — without sacrificing streaming performance.
 
 ```
-npm install @aegis-ai/core
+npm install @aegis-sdk/core
 ```
 
 ---
@@ -58,7 +58,7 @@ Three lines to protect a Next.js chatbot:
 // app/api/chat/route.ts
 import { streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis({ policy: 'strict' });
 
@@ -88,7 +88,7 @@ That's it. You now have:
 ### Standalone (Any Framework)
 
 ```typescript
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis();
 
@@ -118,7 +118,7 @@ Aegis works with the Vercel AI SDK across every major framework. The server-side
 ```typescript
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis({ policy: 'strict' });
 
@@ -179,7 +179,7 @@ export async function POST({ request }) {
 ```typescript
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis({ policy: 'strict' });
 
@@ -244,7 +244,7 @@ function handleSubmit(e: Event) {
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { createFileRoute } from '@tanstack/react-router';
-import { Aegis } from '@aegis-ai/core';
+import { Aegis } from '@aegis-sdk/core';
 
 const aegis = new Aegis({ policy: 'strict' });
 
@@ -435,7 +435,7 @@ import {
   Sandbox,         // Process untrusted content safely
   StreamMonitor,   // Real-time output scanning
   AuditLog,        // Decision trail
-} from '@aegis-ai/core';
+} from '@aegis-sdk/core';
 ```
 
 ### Quarantine — Track What's Trusted
@@ -540,7 +540,7 @@ Proposed tool call
 Get started without writing a policy from scratch:
 
 ```typescript
-import { presets } from '@aegis-ai/core';
+import { presets } from '@aegis-sdk/core';
 
 const policy = presets.customerSupport();  // Tuned for support bots
 const policy = presets.codeAssistant();    // Tuned for code generation
@@ -555,17 +555,17 @@ const policy = presets.paranoid();         // Maximum security
 
 | Framework | Package | Status |
 |:----------|:--------|:-------|
-| **Vercel AI SDK** | `@aegis-ai/core` (built-in) | v0.1.0 |
-| **Next.js** | `@aegis-ai/next` | v0.1.0 |
-| **SvelteKit** | `@aegis-ai/sveltekit` | v0.1.0 |
-| **Nuxt** | `@aegis-ai/core` (works directly) | v0.1.0 |
-| **TanStack Start** | `@aegis-ai/core` (works directly) | v0.1.0 |
-| **Express** | `@aegis-ai/express` | v0.2.0 |
-| **LangChain.js** | `@aegis-ai/langchain` | v0.2.0 |
-| **Hono** | `@aegis-ai/hono` | v0.3.0 |
-| **Fastify** | `@aegis-ai/fastify` | v0.3.0 |
+| **Vercel AI SDK** | `@aegis-sdk/core` (built-in) | v0.1.0 |
+| **Next.js** | `@aegis-sdk/next` | v0.1.0 |
+| **SvelteKit** | `@aegis-sdk/sveltekit` | v0.1.0 |
+| **Nuxt** | `@aegis-sdk/core` (works directly) | v0.1.0 |
+| **TanStack Start** | `@aegis-sdk/core` (works directly) | v0.1.0 |
+| **Express** | `@aegis-sdk/express` | v0.2.0 |
+| **LangChain.js** | `@aegis-sdk/langchain` | v0.2.0 |
+| **Hono** | `@aegis-sdk/hono` | v0.3.0 |
+| **Fastify** | `@aegis-sdk/fastify` | v0.3.0 |
 
-Any framework that uses the Vercel AI SDK's `streamText()` works with Aegis out of the box — no adapter needed. Framework-specific packages (like `@aegis-ai/express`) add middleware convenience for non-AI-SDK setups.
+Any framework that uses the Vercel AI SDK's `streamText()` works with Aegis out of the box — no adapter needed. Framework-specific packages (like `@aegis-sdk/express`) add middleware convenience for non-AI-SDK setups.
 
 Works with **any LLM provider**: OpenAI, Anthropic, Google, Mistral, Ollama, or custom endpoints.
 
@@ -638,7 +638,7 @@ Aegis exports metrics, traces, and logs to your existing monitoring:
 Aegis includes built-in red team tools:
 
 ```typescript
-import { redTeam } from '@aegis-ai/testing';
+import { redTeam } from '@aegis-sdk/testing';
 
 const results = await redTeam.scan({
   target: myAegisConfig,
