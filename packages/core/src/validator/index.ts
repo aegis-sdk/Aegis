@@ -16,7 +16,7 @@ interface RateLimitEntry {
  */
 export class ActionValidator {
   private policy: AegisPolicy;
-  private rateLimits: Map<string, RateLimitEntry> = new Map();
+  private rateLimits = new Map<string, RateLimitEntry>();
 
   constructor(policy: AegisPolicy) {
     this.policy = policy;
@@ -121,7 +121,7 @@ function parseWindow(window: string): number {
   const match = window.match(/^(\d+)([smhd])$/);
   if (!match) return 60_000; // Default: 1 minute
 
-  const value = parseInt(match[1]!, 10);
+  const value = parseInt(match[1] ?? "1", 10);
   const unit = match[2];
 
   switch (unit) {

@@ -3,7 +3,6 @@ import type {
   PromptBuilderConfig,
   BuiltPrompt,
   PromptMessage,
-  DelimiterStrategy,
 } from "../types.js";
 import { isQuarantined } from "../quarantine/index.js";
 

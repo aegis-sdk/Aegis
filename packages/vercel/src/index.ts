@@ -86,9 +86,9 @@ export function createAegisMiddleware(
  */
 export async function guardMessages(
   aegis: Aegis,
-  messages: Array<{ role: string; content: string }>,
+  messages: { role: string; content: string }[],
   options?: { scanStrategy?: "last-user" | "all-user" | "full-history" },
-): Promise<Array<{ role: string; content: string }>> {
+): Promise<{ role: string; content: string }[]> {
   // Convert to Aegis format
   const aegisMessages = messages.map((m) => ({
     role: m.role as "system" | "user" | "assistant",

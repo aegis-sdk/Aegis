@@ -9,12 +9,12 @@ export interface RedTeamResult {
   missed: number;
   falseNegatives: AttackPayload[];
   detectionRate: number;
-  results: Array<{
+  results: {
     payload: AttackPayload;
     detected: boolean;
     score: number;
     detections: number;
-  }>;
+  }[];
 }
 
 export interface RedTeamOptions {

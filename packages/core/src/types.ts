@@ -236,13 +236,11 @@ export interface SandboxConfig {
   model: string;
 }
 
-export interface ExtractionSchema {
-  [key: string]: {
+export type ExtractionSchema = Record<string, {
     type: "string" | "number" | "boolean" | "enum";
     values?: string[];
     maxLength?: number;
-  };
-}
+  }>;
 
 // ─── Audit ───────────────────────────────────────────────────────────────────
 

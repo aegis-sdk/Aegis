@@ -4,7 +4,6 @@ import type {
   GuardInputOptions,
   PromptMessage,
   ScanResult,
-  StreamMonitorConfig,
 } from "./types.js";
 import { quarantine } from "./quarantine/index.js";
 import { InputScanner } from "./scanner/index.js";

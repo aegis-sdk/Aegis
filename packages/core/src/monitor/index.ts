@@ -9,6 +9,7 @@ const DEFAULT_CONFIG: Required<StreamMonitorConfig> = {
   customPatterns: [],
   chunkStrategy: "sentence",
   chunkSize: 50,
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   onViolation: () => {},
 };
 
@@ -27,7 +28,7 @@ const SECRET_PATTERNS = {
   // OpenAI API key
   openaiKey: /sk-[A-Za-z0-9]{20,}/,
   // Generic API key pattern
-  genericApiKey: /(?:api[_-]?key|apikey|secret[_-]?key)\s*[:=]\s*['"]?[A-Za-z0-9_\-]{16,}/i,
+  genericApiKey: /(?:api[_-]?key|apikey|secret[_-]?key)\s*[:=]\s*['"]?[A-Za-z0-9_-]{16,}/i,
   // AWS access key
   awsKey: /(?:AKIA|ASIA)[A-Z0-9]{16}/,
   // Generic bearer token
@@ -80,8 +81,8 @@ export class StreamMonitor {
 
         if (violations.length > 0) {
           // Emit what we have up to the violation point, then terminate
-          const violation = violations[0]!;
-          config.onViolation(violation);
+          const violation = violations[0];
+          if (violation) config.onViolation(violation);
           controller.terminate();
           return;
         }
@@ -102,7 +103,8 @@ export class StreamMonitor {
         if (buffer) {
           const violations = scanForViolations(buffer, allPatterns, config);
           if (violations.length > 0) {
-            config.onViolation(violations[0]!);
+            const violation = violations[0];
+            if (violation) config.onViolation(violation);
             controller.terminate();
             return;
           }
@@ -112,8 +114,8 @@ export class StreamMonitor {
     });
   }
 
-  private buildPatternList(): Array<{ pattern: RegExp; type: StreamViolation["type"]; description: string }> {
-    const patterns: Array<{ pattern: RegExp; type: StreamViolation["type"]; description: string }> = [];
+  private buildPatternList(): { pattern: RegExp; type: StreamViolation["type"]; description: string }[] {
+    const patterns: { pattern: RegExp; type: StreamViolation["type"]; description: string }[] = [];
 
     // Canary tokens
     for (const token of this.config.canaryTokens) {
@@ -161,7 +163,7 @@ export class StreamMonitor {
 
 function scanForViolations(
   text: string,
-  patterns: Array<{ pattern: RegExp; type: StreamViolation["type"]; description: string }>,
+  patterns: { pattern: RegExp; type: StreamViolation["type"]; description: string }[],
   _config: Required<StreamMonitorConfig>,
 ): StreamViolation[] {
   const violations: StreamViolation[] = [];

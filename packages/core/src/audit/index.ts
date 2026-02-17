@@ -76,7 +76,8 @@ export class AuditLog {
       results = results.filter((e) => e.event === filters.event);
     }
     if (filters.since) {
-      results = results.filter((e) => e.timestamp >= filters.since!);
+      const since = filters.since;
+      results = results.filter((e) => e.timestamp >= since);
     }
     if (filters.sessionId) {
       results = results.filter((e) => e.sessionId === filters.sessionId);
