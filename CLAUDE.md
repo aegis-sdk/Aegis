@@ -92,9 +92,43 @@ User Input → Quarantine → Input Scanner → [Adaptive Sandbox] → Prompt Bu
 
 ## Package Scope
 
-- npm organization: `@aegis-sdk`
+- npm organization: `@aegis-sdk` (owner: msjoshlopez)
 - GitHub organization: `aegis-sdk`
+- GitHub repo: `https://github.com/aegis-sdk/Aegis`
 - All packages published as `@aegis-sdk/<name>`
+
+## Publishing & Releases
+
+We use **Changesets** for versioning and automated npm publishing.
+
+### How to release
+
+1. **Create a changeset** — describes what changed and the semver bump:
+   ```bash
+   pnpm changeset
+   ```
+   This walks you through selecting which packages changed and whether it's a patch/minor/major. It creates a markdown file in `.changeset/`.
+
+2. **Commit and push** the changeset file to `main`.
+
+3. **GitHub Action auto-creates a "Version Packages" PR** that:
+   - Bumps `version` in each affected package.json
+   - Updates CHANGELOG.md files
+   - Removes the consumed changeset files
+
+4. **Merge that PR** → the GitHub Action automatically publishes to npm.
+
+### Manual publish (if needed)
+
+```bash
+pnpm build && pnpm release
+```
+
+### CI/CD setup
+
+- **CI workflow** (`.github/workflows/ci.yml`): Runs lint, typecheck, tests (Node 18/20/22), coverage, build, and adversarial suite on every push/PR to main.
+- **Publish workflow** (`.github/workflows/publish.yml`): On push to main, builds, tests, then runs `changesets/action` which either creates a version PR or publishes to npm.
+- **NPM_TOKEN**: Stored as a GitHub Actions secret. This is a granular access token scoped to `@aegis-sdk/*` packages. If it expires, generate a new one at https://www.npmjs.com/settings/msjoshlopez/tokens and update the secret at https://github.com/aegis-sdk/Aegis/settings/secrets/actions.
 
 ## Important Notes
 
