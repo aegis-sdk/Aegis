@@ -107,6 +107,217 @@ const cleanData = await aegis.sandbox(emailBody, {
 
 ---
 
+## Framework Examples
+
+Aegis works with the Vercel AI SDK across every major framework. The server-side pattern is the same — `guardInput()` scans messages, `createStreamTransform()` monitors the output stream.
+
+### SvelteKit
+
+**Server route** — `src/routes/api/chat/+server.ts`:
+
+```typescript
+import { streamText, convertToModelMessages, type UIMessage } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { Aegis } from '@aegis-ai/core';
+
+const aegis = new Aegis({ policy: 'strict' });
+
+export async function POST({ request }) {
+  const { messages }: { messages: UIMessage[] } = await request.json();
+
+  const safeMessages = await aegis.guardInput(
+    await convertToModelMessages(messages),
+  );
+
+  const result = streamText({
+    model: anthropic('claude-sonnet-4-5-20250929'),
+    messages: safeMessages,
+    experimental_transform: aegis.createStreamTransform(),
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+**Client** — `src/routes/+page.svelte`:
+
+```svelte
+<script lang="ts">
+  import { Chat } from '@ai-sdk/svelte';
+
+  let input = $state('');
+  const chat = new Chat({});
+
+  function handleSubmit(e: SubmitEvent) {
+    e.preventDefault();
+    chat.sendMessage({ text: input });
+    input = '';
+  }
+</script>
+
+<ul>
+  {#each chat.messages as message}
+    <li>
+      <strong>{message.role}:</strong>
+      {#each message.parts as part}
+        {#if part.type === 'text'}{part.text}{/if}
+      {/each}
+    </li>
+  {/each}
+</ul>
+
+<form onsubmit={handleSubmit}>
+  <input bind:value={input} placeholder="Say something..." />
+  <button type="submit">Send</button>
+</form>
+```
+
+### Nuxt
+
+**Server route** — `server/api/chat.ts`:
+
+```typescript
+import { streamText, convertToModelMessages, type UIMessage } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { Aegis } from '@aegis-ai/core';
+
+const aegis = new Aegis({ policy: 'strict' });
+
+export default defineLazyEventHandler(async () => {
+  return defineEventHandler(async (event) => {
+    const { messages }: { messages: UIMessage[] } = await readBody(event);
+
+    const safeMessages = await aegis.guardInput(
+      await convertToModelMessages(messages),
+    );
+
+    const result = streamText({
+      model: openai('gpt-4o'),
+      messages: safeMessages,
+      experimental_transform: aegis.createStreamTransform(),
+    });
+
+    return result.toUIMessageStreamResponse();
+  });
+});
+```
+
+**Client** — `pages/index.vue`:
+
+```vue
+<script setup lang="ts">
+import { Chat } from '@ai-sdk/vue';
+import { ref } from 'vue';
+
+const input = ref('');
+const chat = new Chat({});
+
+function handleSubmit(e: Event) {
+  e.preventDefault();
+  chat.sendMessage({ text: input.value });
+  input.value = '';
+}
+</script>
+
+<template>
+  <div>
+    <div v-for="m in chat.messages" :key="m.id">
+      <strong>{{ m.role === 'user' ? 'User' : 'AI' }}:</strong>
+      <span v-for="(part, i) in m.parts" :key="i">
+        <span v-if="part.type === 'text'">{{ part.text }}</span>
+      </span>
+    </div>
+
+    <form @submit="handleSubmit">
+      <input v-model="input" placeholder="Say something..." />
+      <button type="submit">Send</button>
+    </form>
+  </div>
+</template>
+```
+
+### TanStack Start
+
+**Server route** — `src/routes/api/chat.ts`:
+
+```typescript
+import { streamText, convertToModelMessages, type UIMessage } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { createFileRoute } from '@tanstack/react-router';
+import { Aegis } from '@aegis-ai/core';
+
+const aegis = new Aegis({ policy: 'strict' });
+
+export const Route = createFileRoute('/api/chat')({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const { messages }: { messages: UIMessage[] } = await request.json();
+
+        const safeMessages = await aegis.guardInput(
+          await convertToModelMessages(messages),
+        );
+
+        const result = streamText({
+          model: openai('gpt-4o'),
+          messages: safeMessages,
+          experimental_transform: aegis.createStreamTransform(),
+        });
+
+        return result.toUIMessageStreamResponse();
+      },
+    },
+  },
+});
+```
+
+**Client** — `src/routes/index.tsx`:
+
+```tsx
+import { createFileRoute } from '@tanstack/react-router';
+import { useChat } from '@ai-sdk/react';
+import { useState } from 'react';
+
+export const Route = createFileRoute('/')({
+  component: Chat,
+});
+
+function Chat() {
+  const [input, setInput] = useState('');
+  const { messages, sendMessage } = useChat();
+
+  return (
+    <div>
+      {messages.map((message) => (
+        <div key={message.id}>
+          <strong>{message.role === 'user' ? 'User' : 'AI'}:</strong>
+          {message.parts.map((part, i) =>
+            part.type === 'text' ? <span key={i}>{part.text}</span> : null,
+          )}
+        </div>
+      ))}
+
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        sendMessage({ text: input });
+        setInput('');
+      }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Say something..."
+        />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  );
+}
+```
+
+> **Notice the pattern:** The server-side code is nearly identical across all frameworks. Aegis hooks into `streamText()` the same way regardless of whether you're using SvelteKit, Nuxt, TanStack Start, or Next.js. The client side is untouched — Aegis is server-only.
+
+---
+
 ## What It Defends Against
 
 Aegis covers **19 threat categories** across the full attack surface:
@@ -346,11 +557,15 @@ const policy = presets.paranoid();         // Maximum security
 |:----------|:--------|:-------|
 | **Vercel AI SDK** | `@aegis-ai/core` (built-in) | v0.1.0 |
 | **Next.js** | `@aegis-ai/next` | v0.1.0 |
+| **SvelteKit** | `@aegis-ai/sveltekit` | v0.1.0 |
+| **Nuxt** | `@aegis-ai/core` (works directly) | v0.1.0 |
+| **TanStack Start** | `@aegis-ai/core` (works directly) | v0.1.0 |
 | **Express** | `@aegis-ai/express` | v0.2.0 |
 | **LangChain.js** | `@aegis-ai/langchain` | v0.2.0 |
 | **Hono** | `@aegis-ai/hono` | v0.3.0 |
-| **SvelteKit** | `@aegis-ai/sveltekit` | v0.3.0 |
 | **Fastify** | `@aegis-ai/fastify` | v0.3.0 |
+
+Any framework that uses the Vercel AI SDK's `streamText()` works with Aegis out of the box — no adapter needed. Framework-specific packages (like `@aegis-ai/express`) add middleware convenience for non-AI-SDK setups.
 
 Works with **any LLM provider**: OpenAI, Anthropic, Google, Mistral, Ollama, or custom endpoints.
 
