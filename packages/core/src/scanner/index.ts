@@ -9,6 +9,7 @@ import type {
 import { INJECTION_PATTERNS } from "./patterns.js";
 import { normalizeEncoding } from "./encoding.js";
 import { analyzeEntropy } from "./entropy.js";
+import { detectLanguageSwitches } from "./language.js";
 
 const DEFAULT_CONFIG: Required<InputScannerConfig> = {
   sensitivity: "balanced",
@@ -102,6 +103,22 @@ export class InputScanner {
       });
     }
 
+    // Step 7: Language/script detection
+    const language = this.config.languageDetection
+      ? detectLanguageSwitches(normalized)
+      : { primary: "unknown", switches: [] };
+
+    if (this.config.languageDetection && language.switches.length >= 3) {
+      detections.push({
+        type: "language_switching",
+        pattern: "excessive_script_switches",
+        matched: `${language.switches.length} script switches detected`,
+        severity: language.switches.length >= 5 ? "high" : "medium",
+        position: { start: 0, end: normalized.length },
+        description: `Suspicious language switching: ${language.switches.length} script changes (${language.switches.map((s) => `${s.from}→${s.to}`).join(", ")})`,
+      });
+    }
+
     // Calculate composite score
     const score = this.calculateScore(detections, entropy.anomalous);
 
@@ -114,7 +131,7 @@ export class InputScanner {
       score,
       detections,
       normalized,
-      language: { primary: "en", switches: [] }, // TODO: implement language detection
+      language,
       entropy,
     };
   }

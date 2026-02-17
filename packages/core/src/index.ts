@@ -1,5 +1,11 @@
 // ─── Main Entry Points ───────────────────────────────────────────────────────
-export { Aegis, AegisInputBlocked, aegis } from "./aegis.js";
+export {
+  Aegis,
+  AegisInputBlocked,
+  AegisSessionQuarantined,
+  AegisSessionTerminated,
+  aegis,
+} from "./aegis.js";
 
 // ─── Core Modules ────────────────────────────────────────────────────────────
 export { quarantine, isQuarantined } from "./quarantine/index.js";
@@ -16,6 +22,7 @@ export { resolvePolicy, getPreset, isActionAllowed } from "./policy/index.js";
 // ─── Utilities ───────────────────────────────────────────────────────────────
 export { normalizeEncoding, tryDecodeBase64 } from "./scanner/encoding.js";
 export { shannonEntropy, analyzeEntropy } from "./scanner/entropy.js";
+export { detectLanguageSwitches } from "./scanner/language.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type {

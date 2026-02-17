@@ -1,0 +1,24 @@
+{
+  "name": "aegis-nextjs-chatbot",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^15",
+    "react": "^19",
+    "react-dom": "^19",
+    "ai": "^4",
+    "@ai-sdk/openai": "^1",
+    "@aegis-sdk/core": "workspace:*",
+    "@aegis-sdk/vercel": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "typescript": "^5"
+  }
+}

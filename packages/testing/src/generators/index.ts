@@ -27,7 +27,7 @@ export class PayloadGenerator {
    * Get all attack payloads for a specific threat category.
    */
   getPayloadsForThreat(threatCategory: string): AttackPayload[] {
-    return ATTACK_SUITES.filter((suite) => suite.threatCategory === threatCategory).flatMap(
+    return ATTACK_SUITES.filter((suite) => suite.threatCategories.includes(threatCategory)).flatMap(
       (suite) => suite.payloads,
     );
   }

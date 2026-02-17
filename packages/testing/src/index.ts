@@ -16,5 +16,13 @@
  */
 
 export { RedTeamScanner } from "./scanner.js";
-export { ATTACK_SUITES, type AttackSuite, type AttackPayload } from "./suites/index.js";
+export {
+  ATTACK_SUITES,
+  getAllSuites,
+  getSuiteById,
+  getSuitesByThreatCategory,
+  getAllPayloads,
+  type AttackSuite,
+  type AttackPayload,
+} from "./suites/index.js";
 export { PayloadGenerator } from "./generators/index.js";

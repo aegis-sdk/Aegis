@@ -1,6 +1,6 @@
 {
   "name": "@aegis-sdk/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Streaming-first prompt injection defense for AI applications",
   "license": "MIT",
   "type": "module",

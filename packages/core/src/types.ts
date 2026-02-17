@@ -95,6 +95,16 @@ export type DetectionType =
   | "virtualization"
   | "markdown_injection"
   | "context_flooding"
+  | "indirect_injection"
+  | "tool_abuse"
+  | "data_exfiltration"
+  | "privilege_escalation"
+  | "memory_poisoning"
+  | "chain_injection"
+  | "history_manipulation"
+  | "denial_of_wallet"
+  | "language_switching"
+  | "model_fingerprinting"
   | "custom";
 
 export interface LanguageResult {

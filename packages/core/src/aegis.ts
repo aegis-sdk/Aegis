@@ -3,6 +3,7 @@ import type {
   AegisPolicy,
   GuardInputOptions,
   PromptMessage,
+  RecoveryConfig,
   ScanResult,
 } from "./types.js";
 import { quarantine } from "./quarantine/index.js";
@@ -40,6 +41,8 @@ export class Aegis {
   private monitor: StreamMonitor;
   private audit: AuditLog;
   private validator: ActionValidator;
+  private recovery: RecoveryConfig;
+  private sessionQuarantined = false;
 
   constructor(config: AegisConfig = {}) {
     this.policy = resolvePolicy(config.policy ?? "balanced");
@@ -54,6 +57,7 @@ export class Aegis {
     });
     this.audit = new AuditLog(config.audit);
     this.validator = new ActionValidator(this.policy);
+    this.recovery = config.recovery ?? { mode: "continue" };
   }
 
   /**
@@ -72,8 +76,17 @@ export class Aegis {
     messages: PromptMessage[],
     options: GuardInputOptions = {},
   ): Promise<PromptMessage[]> {
-    const strategy = options.scanStrategy ?? "last-user";
+    // If session is quarantined, block all input
+    if (this.sessionQuarantined) {
+      this.audit.log({
+        event: "session_quarantine",
+        decision: "blocked",
+        context: { reason: "Session is quarantined — all input blocked" },
+      });
+      throw new AegisSessionQuarantined();
+    }
 
+    const strategy = options.scanStrategy ?? "last-user";
     const messagesToScan = this.getMessagesToScan(messages, strategy);
 
     for (const msg of messagesToScan) {
@@ -91,7 +104,7 @@ export class Aegis {
       });
 
       if (!result.safe) {
-        throw new AegisInputBlocked(result);
+        return this.handleRecovery(messages, msg, result);
       }
     }
 
@@ -112,6 +125,63 @@ export class Aegis {
     }
 
     return messages;
+  }
+
+  /**
+   * Handle a blocked message according to the configured recovery mode.
+   *
+   * Recovery modes:
+   * - `continue`: Throw immediately (default, same as no recovery)
+   * - `reset-last`: Strip the offending message and return the remaining history
+   * - `quarantine-session`: Lock the session — all future input is blocked
+   * - `terminate-session`: Throw a terminal error (session must be recreated)
+   */
+  private handleRecovery(
+    messages: PromptMessage[],
+    offending: PromptMessage,
+    result: ScanResult,
+  ): never | PromptMessage[] {
+    switch (this.recovery.mode) {
+      case "reset-last": {
+        this.audit.log({
+          event: "kill_switch",
+          decision: "blocked",
+          context: { recovery: "reset-last", score: result.score },
+        });
+        // Return all messages except the offending one
+        return messages.filter((m) => m !== offending);
+      }
+
+      case "quarantine-session": {
+        this.sessionQuarantined = true;
+        this.audit.log({
+          event: "session_quarantine",
+          decision: "blocked",
+          context: { recovery: "quarantine-session", score: result.score },
+        });
+        throw new AegisSessionQuarantined();
+      }
+
+      case "terminate-session": {
+        this.audit.log({
+          event: "kill_switch",
+          decision: "blocked",
+          context: { recovery: "terminate-session", score: result.score },
+        });
+        throw new AegisSessionTerminated(result);
+      }
+
+      case "continue":
+      default:
+        throw new AegisInputBlocked(result);
+    }
+  }
+
+  /**
+   * Check whether the current session has been quarantined.
+   */
+  isSessionQuarantined(): boolean {
+    return this.sessionQuarantined;
   }
 
   /**
@@ -173,6 +243,33 @@ export class AegisInputBlocked extends Error {
       `[aegis] Input blocked: ${result.detections.length} violation(s) detected (score: ${result.score.toFixed(2)})`,
     );
     this.name = "AegisInputBlocked";
+    this.scanResult = result;
+  }
+}
+
+/**
+ * Error thrown when a session has been quarantined.
+ * No further input will be accepted until a new Aegis instance is created.
+ */
+export class AegisSessionQuarantined extends Error {
+  constructor() {
+    super("[aegis] Session quarantined: all input is blocked until session is reset");
+    this.name = "AegisSessionQuarantined";
+  }
+}
+
+/**
+ * Error thrown when a session is terminated due to a critical violation.
+ * The session cannot be recovered — a new Aegis instance must be created.
+ */
+export class AegisSessionTerminated extends Error {
+  public readonly scanResult: ScanResult;
+
+  constructor(result: ScanResult) {
+    super(
+      `[aegis] Session terminated: ${result.detections.length} violation(s) (score: ${result.score.toFixed(2)})`,
+    );
+    this.name = "AegisSessionTerminated";
     this.scanResult = result;
   }
 }
