@@ -104,7 +104,10 @@ export class ActionValidator {
         }
 
         // Check for SQL injection
-        if (/('|--|;|\bUNION\b|\bDROP\b|\bDELETE\b)/i.test(value) && key.toLowerCase().includes("query")) {
+        if (
+          /('|--|;|\bUNION\b|\bDROP\b|\bDELETE\b)/i.test(value) &&
+          key.toLowerCase().includes("query")
+        ) {
           return {
             allowed: false,
             reason: `Suspicious pattern in parameter "${key}": possible SQL injection`,

@@ -18,13 +18,15 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
   // ─── Instruction Override ──────────────────────────────────────────────────
   {
     type: "instruction_override",
-    pattern: /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|context)/i,
+    pattern:
+      /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|context)/i,
     severity: "critical",
     description: "Attempts to override previous instructions",
   },
   {
     type: "instruction_override",
-    pattern: /disregard\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompts?|rules?|guidelines)/i,
+    pattern:
+      /disregard\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompts?|rules?|guidelines)/i,
     severity: "critical",
     description: "Attempts to disregard prior instructions",
   },
@@ -36,7 +38,8 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
   },
   {
     type: "instruction_override",
-    pattern: /forget\s+(everything|all|what)\s+(you('ve)?|you\s+were|was)\s+(told|instructed|learned)/i,
+    pattern:
+      /forget\s+(everything|all|what)\s+(you('ve)?|you\s+were|was)\s+(told|instructed|learned)/i,
     severity: "critical",
     description: "Attempts to clear model context",
   },

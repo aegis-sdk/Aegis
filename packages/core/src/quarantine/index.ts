@@ -88,13 +88,9 @@ export function quarantine<T>(content: T, options: QuarantineOptions): Quarantin
       unwrapCount++;
 
       if (opts.audit !== false) {
-        // Audit logging will be handled by the AuditLog module
-        // For now, emit a console warning in production
-        if (typeof process !== "undefined" && process.env?.["NODE_ENV"] === "production") {
-          console.warn(
-            `[aegis] unsafeUnwrap() called: "${opts.reason}" (source: ${metadata.source}, risk: ${metadata.risk})`,
-          );
-        }
+        console.warn(
+          `[aegis] unsafeUnwrap() called: "${opts.reason}" (source: ${metadata.source}, risk: ${metadata.risk})`,
+        );
       }
 
       if (unwrapCount > UNWRAP_THRESHOLD && onExcessiveUnwrap) {

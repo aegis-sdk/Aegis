@@ -63,9 +63,7 @@ export function createAegisTransform(
  * });
  * ```
  */
-export function createAegisMiddleware(
-  _aegis: Aegis,
-): {
+export function createAegisMiddleware(_aegis: Aegis): {
   wrapStream: (options: { stream: ReadableStream }) => ReadableStream;
 } {
   // Full middleware implementation requires deeper Vercel AI SDK type integration.

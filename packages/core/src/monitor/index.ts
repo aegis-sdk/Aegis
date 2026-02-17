@@ -114,7 +114,11 @@ export class StreamMonitor {
     });
   }
 
-  private buildPatternList(): { pattern: RegExp; type: StreamViolation["type"]; description: string }[] {
+  private buildPatternList(): {
+    pattern: RegExp;
+    type: StreamViolation["type"];
+    description: string;
+  }[] {
     const patterns: { pattern: RegExp; type: StreamViolation["type"]; description: string }[] = [];
 
     // Canary tokens

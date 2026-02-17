@@ -99,7 +99,9 @@ export function tryDecodeBase64(segment: string): string | null {
   try {
     const decoded = atob(segment.trim());
     // Check if decoded text is mostly printable ASCII
-    const printableRatio = [...decoded].filter((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) <= 126).length / decoded.length;
+    const printableRatio =
+      [...decoded].filter((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) <= 126).length /
+      decoded.length;
     if (printableRatio > 0.8) {
       return decoded;
     }

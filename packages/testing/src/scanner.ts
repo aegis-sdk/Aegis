@@ -45,10 +45,7 @@ export class RedTeamScanner {
    */
   async run(aegis: Aegis, options: RedTeamOptions = {}): Promise<RedTeamResult> {
     const suites = this.getSuites(options.suites);
-    const allPayloads = [
-      ...suites.flatMap((s) => s.payloads),
-      ...(options.customPayloads ?? []),
-    ];
+    const allPayloads = [...suites.flatMap((s) => s.payloads), ...(options.customPayloads ?? [])];
 
     const results: RedTeamResult["results"] = [];
     const falseNegatives: AttackPayload[] = [];
@@ -57,10 +54,9 @@ export class RedTeamScanner {
       const quarantined = quarantine(payload.payload, { source: "user_input" });
 
       try {
-        await aegis.guardInput(
-          [{ role: "user", content: payload.payload }],
-          { scanStrategy: "last-user" },
-        );
+        await aegis.guardInput([{ role: "user", content: payload.payload }], {
+          scanStrategy: "last-user",
+        });
         // If guardInput didn't throw, the payload was NOT detected
         results.push({ payload, detected: false, score: 0, detections: 0 });
         if (payload.expectedDetection) {

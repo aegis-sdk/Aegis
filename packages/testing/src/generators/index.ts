@@ -27,9 +27,9 @@ export class PayloadGenerator {
    * Get all attack payloads for a specific threat category.
    */
   getPayloadsForThreat(threatCategory: string): AttackPayload[] {
-    return ATTACK_SUITES
-      .filter((suite) => suite.threatCategory === threatCategory)
-      .flatMap((suite) => suite.payloads);
+    return ATTACK_SUITES.filter((suite) => suite.threatCategory === threatCategory).flatMap(
+      (suite) => suite.payloads,
+    );
   }
 
   /**
@@ -45,7 +45,12 @@ export class PayloadGenerator {
 
   private leetSpeak(text: string): string {
     const map: Record<string, string> = {
-      a: "4", e: "3", i: "1", o: "0", s: "5", t: "7",
+      a: "4",
+      e: "3",
+      i: "1",
+      o: "0",
+      s: "5",
+      t: "7",
     };
     return text
       .split("")

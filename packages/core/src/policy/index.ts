@@ -175,7 +175,9 @@ export function resolvePolicy(input: PresetPolicy | AegisPolicy | string): Aegis
       return structuredClone(PRESETS[input as PresetPolicy]);
     }
     // TODO: Load from YAML/JSON file path
-    throw new Error(`[aegis] Unknown policy preset: "${input}". Use one of: ${Object.keys(PRESETS).join(", ")}`);
+    throw new Error(
+      `[aegis] Unknown policy preset: "${input}". Use one of: ${Object.keys(PRESETS).join(", ")}`,
+    );
   }
   return input;
 }
@@ -197,14 +199,22 @@ export function isActionAllowed(
   // Check deny list first (overrides allow)
   for (const pattern of policy.capabilities.deny) {
     if (matchesGlob(toolName, pattern)) {
-      return { allowed: false, requiresApproval: false, reason: `Tool "${toolName}" is in the deny list` };
+      return {
+        allowed: false,
+        requiresApproval: false,
+        reason: `Tool "${toolName}" is in the deny list`,
+      };
     }
   }
 
   // Check approval list
   for (const pattern of policy.capabilities.requireApproval) {
     if (matchesGlob(toolName, pattern)) {
-      return { allowed: true, requiresApproval: true, reason: `Tool "${toolName}" requires human approval` };
+      return {
+        allowed: true,
+        requiresApproval: true,
+        reason: `Tool "${toolName}" requires human approval`,
+      };
     }
   }
 
@@ -217,7 +227,11 @@ export function isActionAllowed(
 
   // Default: deny if allow list is non-empty and doesn't match
   if (policy.capabilities.allow.length > 0) {
-    return { allowed: false, requiresApproval: false, reason: `Tool "${toolName}" is not in the allow list` };
+    return {
+      allowed: false,
+      requiresApproval: false,
+      reason: `Tool "${toolName}" is not in the allow list`,
+    };
   }
 
   return { allowed: true, requiresApproval: false, reason: "No restrictions configured" };

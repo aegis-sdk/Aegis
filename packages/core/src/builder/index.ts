@@ -1,9 +1,4 @@
-import type {
-  Quarantined,
-  PromptBuilderConfig,
-  BuiltPrompt,
-  PromptMessage,
-} from "../types.js";
+import type { Quarantined, PromptBuilderConfig, BuiltPrompt, PromptMessage } from "../types.js";
 import { isQuarantined } from "../quarantine/index.js";
 
 const DEFAULT_CONFIG: Required<PromptBuilderConfig> = {
@@ -165,10 +160,7 @@ export class PromptBuilder {
     }
   }
 
-  private estimateOverhead(
-    systemBlocks: ContentBlock[],
-    allMessages: PromptMessage[],
-  ): number {
+  private estimateOverhead(systemBlocks: ContentBlock[], allMessages: PromptMessage[]): number {
     const totalChars = allMessages.reduce((sum, m) => sum + m.content.length, 0);
     const contentChars = systemBlocks.reduce((sum, b) => sum + b.content.length, 0);
     const overheadChars = totalChars - contentChars;

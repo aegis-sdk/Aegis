@@ -223,7 +223,13 @@ export interface StreamMonitorConfig {
 }
 
 export interface StreamViolation {
-  type: "canary_leak" | "pii_detected" | "secret_detected" | "injection_payload" | "policy_violation" | "custom_pattern";
+  type:
+    | "canary_leak"
+    | "pii_detected"
+    | "secret_detected"
+    | "injection_payload"
+    | "policy_violation"
+    | "custom_pattern";
   matched: string;
   position: number;
   description: string;
@@ -236,11 +242,14 @@ export interface SandboxConfig {
   model: string;
 }
 
-export type ExtractionSchema = Record<string, {
+export type ExtractionSchema = Record<
+  string,
+  {
     type: "string" | "number" | "boolean" | "enum";
     values?: string[];
     maxLength?: number;
-  }>;
+  }
+>;
 
 // ─── Audit ───────────────────────────────────────────────────────────────────
 
@@ -295,7 +304,13 @@ export interface AlertRule {
 
 // ─── Top-Level Aegis ─────────────────────────────────────────────────────────
 
-export type PresetPolicy = "strict" | "balanced" | "permissive" | "customer-support" | "code-assistant" | "paranoid";
+export type PresetPolicy =
+  | "strict"
+  | "balanced"
+  | "permissive"
+  | "customer-support"
+  | "code-assistant"
+  | "paranoid";
 
 export interface AegisConfig {
   policy?: PresetPolicy | AegisPolicy | string;

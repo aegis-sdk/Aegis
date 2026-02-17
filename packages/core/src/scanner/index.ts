@@ -135,7 +135,9 @@ export class InputScanner {
     // Calculate per-message risk scores
     const riskTrend = userMessages.map((msg) => {
       const detections: Detection[] = [];
-      const normalized = this.config.encodingNormalization ? normalizeEncoding(msg.content) : msg.content;
+      const normalized = this.config.encodingNormalization
+        ? normalizeEncoding(msg.content)
+        : msg.content;
       this.runPatternDetection(normalized, detections);
       return this.calculateScore(detections, false);
     });
@@ -148,9 +150,10 @@ export class InputScanner {
     }
 
     // Simple drift metric: how different is the last message from the first?
-    const drift = riskTrend.length > 0
-      ? Math.abs((riskTrend[riskTrend.length - 1] ?? 0) - (riskTrend[0] ?? 0))
-      : 0;
+    const drift =
+      riskTrend.length > 0
+        ? Math.abs((riskTrend[riskTrend.length - 1] ?? 0) - (riskTrend[0] ?? 0))
+        : 0;
 
     return { drift, escalation, riskTrend };
   }
@@ -183,7 +186,8 @@ export class InputScanner {
 
   private detectManyShot(text: string, detections: Detection[]): void {
     // Detect repeated Q&A patterns that suggest many-shot jailbreaking
-    const qaPattern = /(?:(?:Q|Question|Human|User)\s*[:]\s*.+\s*(?:A|Answer|Assistant|AI)\s*[:]\s*.+)/gi;
+    const qaPattern =
+      /(?:(?:Q|Question|Human|User)\s*[:]\s*.+\s*(?:A|Answer|Assistant|AI)\s*[:]\s*.+)/gi;
     const matches = text.match(qaPattern);
 
     if (matches && matches.length >= this.config.manyShotThreshold) {

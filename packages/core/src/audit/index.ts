@@ -1,6 +1,8 @@
 import type { AuditEntry, AuditEventType, AuditLogConfig } from "../types.js";
 
-const DEFAULT_CONFIG: Required<Omit<AuditLogConfig, "alerting">> & { alerting: AuditLogConfig["alerting"] } = {
+const DEFAULT_CONFIG: Required<Omit<AuditLogConfig, "alerting">> & {
+  alerting: AuditLogConfig["alerting"];
+} = {
   transport: "console",
   path: "./aegis-audit.jsonl",
   level: "all",
@@ -145,7 +147,12 @@ export class AuditLog {
   }
 
   private emitConsole(entry: AuditEntry): void {
-    const prefix = entry.decision === "blocked" ? "[AEGIS BLOCK]" : entry.decision === "flagged" ? "[AEGIS FLAG]" : "[AEGIS]";
+    const prefix =
+      entry.decision === "blocked"
+        ? "[AEGIS BLOCK]"
+        : entry.decision === "flagged"
+          ? "[AEGIS FLAG]"
+          : "[AEGIS]";
     const msg = `${prefix} ${entry.event}`;
 
     if (entry.decision === "blocked" || entry.decision === "flagged") {
