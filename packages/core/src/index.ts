@@ -13,8 +13,15 @@ export { InputScanner } from "./scanner/index.js";
 export { PromptBuilder } from "./builder/index.js";
 export { StreamMonitor } from "./monitor/index.js";
 export { AuditLog } from "./audit/index.js";
+export { OTelTransport } from "./audit/otel.js";
+export type { OTelTransportConfig, OTelSpan, OTelCounter, OTelHistogram } from "./audit/otel.js";
+export { FileTransport } from "./audit/file-transport.js";
+export type { FileTransportConfig } from "./audit/file-transport.js";
 export { ActionValidator, parseWindow } from "./validator/index.js";
 export { Sandbox } from "./sandbox/index.js";
+export { MessageSigner } from "./integrity/index.js";
+export { AlertingEngine } from "./alerting/index.js";
+export { TrajectoryAnalyzer } from "./scanner/trajectory.js";
 
 // ─── Policy ──────────────────────────────────────────────────────────────────
 export { resolvePolicy, getPreset, isActionAllowed } from "./policy/index.js";
@@ -82,8 +89,20 @@ export type {
   AuditLogConfig,
   AuditLevel,
   AuditTransport,
+  TransportFn,
   AlertingConfig,
   AlertRule,
+  AlertCondition,
+  Alert,
+
+  // Message Integrity
+  SignedMessage,
+  SignedConversation,
+  IntegrityResult,
+  MessageIntegrityConfig,
+
+  // Trajectory
+  TopicDriftResult,
 
   // Top-level
   AegisConfig,

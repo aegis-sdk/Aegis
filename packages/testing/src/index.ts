@@ -1,8 +1,8 @@
 /**
  * @aegis-sdk/testing — Red team testing tools for Aegis.
  *
- * Provides attack suites, payload generators, and testing utilities
- * for validating prompt injection defenses.
+ * Provides attack suites, payload generators, testing utilities,
+ * and Promptfoo compatibility for validating prompt injection defenses.
  *
  * @example
  * ```ts
@@ -10,12 +10,15 @@
  *
  * const scanner = new RedTeamScanner();
  * const results = await scanner.run(aegis, {
- *   suites: ['instruction-override', 'encoding-bypass', 'role-manipulation'],
+ *   suites: ['direct-injection', 'encoding-bypass', 'role-manipulation'],
+ *   concurrency: 20,
  * });
+ * console.log(scanner.generateReport(results));
  * ```
  */
 
 export { RedTeamScanner } from "./scanner.js";
+export type { RedTeamResult, RedTeamOptions, SuiteResult, PayloadResult } from "./scanner.js";
 export {
   ATTACK_SUITES,
   getAllSuites,
@@ -31,3 +34,12 @@ export {
   type GenerateFuzzPayloadsOptions,
   type FuzzEncoding,
 } from "./generators/index.js";
+export {
+  generatePromptfooConfig,
+  createPromptfooAssertion,
+  type PromptfooConfig,
+  type PromptfooTestCase,
+  type PromptfooAssert,
+  type PromptfooAssertion,
+  type GeneratePromptfooConfigOptions,
+} from "./promptfoo.js";

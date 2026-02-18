@@ -10,6 +10,7 @@ import { INJECTION_PATTERNS } from "./patterns.js";
 import { normalizeEncoding } from "./encoding.js";
 import { analyzeEntropy } from "./entropy.js";
 import { detectLanguageSwitches } from "./language.js";
+import { TrajectoryAnalyzer } from "./trajectory.js";
 
 const DEFAULT_CONFIG: Required<InputScannerConfig> = {
   sensitivity: "balanced",
@@ -153,6 +154,10 @@ export class InputScanner {
    *
    * This is critical for detecting Crescendo attacks (T7) where individual
    * messages look benign but the conversation gradually escalates.
+   *
+   * Combines two analysis approaches:
+   * 1. Pattern-based risk scoring per message (original approach)
+   * 2. Keyword-based topic drift and escalation detection (TrajectoryAnalyzer)
    */
   analyzeTrajectory(messages: PromptMessage[]): TrajectoryResult {
     const userMessages = messages.filter((m) => m.role === "user");
@@ -184,7 +189,14 @@ export class InputScanner {
         ? Math.abs((riskTrend[riskTrend.length - 1] ?? 0) - (riskTrend[0] ?? 0))
         : 0;
 
-    return { drift, escalation, riskTrend };
+    // Enhanced analysis: keyword-based topic drift and escalation detection
+    const trajectoryAnalyzer = new TrajectoryAnalyzer();
+    const topicDrift = trajectoryAnalyzer.analyze(messages);
+
+    // Merge escalation signals: either pattern-based or keyword-based
+    const mergedEscalation = escalation || topicDrift.escalationDetected;
+
+    return { drift, escalation: mergedEscalation, riskTrend, topicDrift };
   }
 
   private runPatternDetection(text: string, detections: Detection[]): void {

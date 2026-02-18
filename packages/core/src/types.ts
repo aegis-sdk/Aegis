@@ -128,6 +128,19 @@ export interface TrajectoryResult {
   drift: number;
   escalation: boolean;
   riskTrend: number[];
+  /** Enhanced topic drift analysis from TrajectoryAnalyzer */
+  topicDrift?: TopicDriftResult;
+}
+
+export interface TopicDriftResult {
+  /** Jaccard similarity scores between consecutive messages */
+  similarities: number[];
+  /** Indices where topic drift was detected (similarity below threshold) */
+  driftIndices: number[];
+  /** Whether escalation keywords appeared progressively */
+  escalationDetected: boolean;
+  /** Escalation keywords found, in order of appearance */
+  escalationKeywords: string[];
 }
 
 export interface InputScannerConfig {
@@ -400,8 +413,25 @@ export interface AuditEntry {
   context: Record<string, unknown>;
 }
 
+/**
+ * A custom transport function invoked for each audit entry.
+ *
+ * May return `void` or `Promise<void>` -- async transports are
+ * fire-and-forget (errors are swallowed to avoid blocking the pipeline).
+ */
+export type TransportFn = (entry: AuditEntry) => void | Promise<void>;
+
 export interface AuditLogConfig {
+  /**
+   * Primary transport (single). Kept for backward compatibility.
+   * When both `transport` and `transports` are set, they are merged.
+   */
   transport?: AuditTransport;
+  /**
+   * Multiple active transports. For example `['console', 'otel', 'custom']`
+   * enables all three simultaneously.
+   */
+  transports?: AuditTransport[];
   path?: string;
   level?: AuditLevel;
   redactContent?: boolean;
@@ -411,12 +441,77 @@ export interface AuditLogConfig {
 export interface AlertingConfig {
   enabled: boolean;
   rules: AlertRule[];
-  webhook?: string;
 }
 
 export interface AlertRule {
-  condition: string;
-  action: "webhook" | "log" | "custom";
+  /** Optional unique identifier for this rule */
+  id?: string;
+  /** The condition that triggers this alert */
+  condition: AlertCondition;
+  /** Action to take when the alert fires */
+  action: "webhook" | "log" | "callback";
+  /** URL to POST to when action is "webhook" */
+  webhookUrl?: string;
+  /** Custom callback function when action is "callback" */
+  callback?: (alert: Alert) => void | Promise<void>;
+  /** Cooldown in ms before re-firing this rule. Default: 60000 (1 min) */
+  cooldownMs?: number;
+}
+
+export type AlertCondition =
+  | { type: "rate-spike"; event: AuditEventType; threshold: number; windowMs: number }
+  | { type: "session-kills"; threshold: number; windowMs: number }
+  | { type: "cost-anomaly"; threshold: number; windowMs: number }
+  | { type: "scan-block-rate"; threshold: number; windowMs: number }
+  | { type: "repeated-attacker"; threshold: number; windowMs: number };
+
+export interface Alert {
+  /** Unique alert identifier */
+  id: string;
+  /** The rule that triggered this alert */
+  ruleId: string;
+  /** The condition that was met */
+  condition: AlertCondition;
+  /** When the alert was triggered */
+  triggeredAt: Date;
+  /** When the alert was resolved (if applicable) */
+  resolvedAt?: Date;
+  /** Additional context about the alert */
+  context: Record<string, unknown>;
+}
+
+// ─── Message Integrity ──────────────────────────────────────────────────
+
+export interface SignedMessage {
+  /** The original message */
+  message: PromptMessage;
+  /** HMAC-SHA256 hex signature */
+  signature: string;
+}
+
+export interface SignedConversation {
+  /** Messages with their signatures */
+  messages: SignedMessage[];
+  /** Chained hash: each signature includes the previous one for ordering integrity */
+  chainHash: string;
+}
+
+export interface IntegrityResult {
+  /** Whether all signatures are valid */
+  valid: boolean;
+  /** Indices of messages with invalid signatures */
+  tamperedIndices: number[];
+  /** Whether the chain hash ordering is intact */
+  chainValid: boolean;
+}
+
+export interface MessageIntegrityConfig {
+  /** HMAC secret. Required. */
+  secret: string;
+  /** Algorithm. Default: 'SHA-256' */
+  algorithm?: string;
+  /** Only sign assistant messages (default: true) */
+  assistantOnly?: boolean;
 }
 
 // ─── Top-Level Aegis ─────────────────────────────────────────────────────────
@@ -438,6 +533,8 @@ export interface AegisConfig {
   canaryTokens?: string[];
   validator?: ActionValidatorConfig;
   agentLoop?: AgentLoopConfig;
+  /** HMAC message integrity configuration for detecting history manipulation (T15) */
+  integrity?: MessageIntegrityConfig;
 }
 
 export interface RecoveryConfig {

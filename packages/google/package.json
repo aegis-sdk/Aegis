@@ -1,7 +1,7 @@
 {
-  "name": "@aegis-sdk/openai",
+  "name": "@aegis-sdk/google",
   "version": "0.3.0",
-  "description": "OpenAI SDK adapter for Aegis prompt injection defense",
+  "description": "Google Gemini SDK adapter for Aegis prompt injection defense",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -30,7 +30,7 @@
   },
   "peerDependencies": {
     "@aegis-sdk/core": "workspace:*",
-    "openai": ">=4.0.0"
+    "@google/generative-ai": ">=0.21.0"
   },
   "dependencies": {
     "@aegis-sdk/core": "workspace:*"

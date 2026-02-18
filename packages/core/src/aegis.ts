@@ -15,6 +15,7 @@ import { StreamMonitor } from "./monitor/index.js";
 import { AuditLog } from "./audit/index.js";
 import { resolvePolicy } from "./policy/index.js";
 import { ActionValidator } from "./validator/index.js";
+import { MessageSigner } from "./integrity/index.js";
 
 /**
  * Aegis — the main entry point for streaming-first prompt injection defense.
@@ -46,6 +47,7 @@ export class Aegis {
   private validator: ActionValidator;
   private recovery: RecoveryConfig;
   private agentLoopConfig: AgentLoopConfig;
+  private messageSigner: MessageSigner | null;
   private sessionQuarantined = false;
 
   /** Default privilege decay schedule */
@@ -70,6 +72,7 @@ export class Aegis {
     this.validator = new ActionValidator(this.policy, config.validator);
     this.recovery = config.recovery ?? { mode: "continue" };
     this.agentLoopConfig = config.agentLoop ?? {};
+    this.messageSigner = config.integrity ? new MessageSigner(config.integrity) : null;
 
     // Wire the validator's audit callback to our AuditLog
     this.validator.setAuditCallback((entry) => {
@@ -231,6 +234,19 @@ export class Aegis {
    */
   getPolicy(): AegisPolicy {
     return this.policy;
+  }
+
+  /**
+   * Get the message signer for HMAC integrity operations.
+   *
+   * Returns null if no integrity configuration was provided.
+   * Use the signer to sign conversations before storing them
+   * and verify them before processing to detect history manipulation (T15).
+   *
+   * @returns The MessageSigner instance, or null if integrity is not configured
+   */
+  getMessageSigner(): MessageSigner | null {
+    return this.messageSigner;
   }
 
   /**

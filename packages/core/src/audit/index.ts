@@ -1,36 +1,164 @@
-import type { AuditEntry, AuditEventType, AuditLogConfig } from "../types.js";
+import type {
+  AuditEntry,
+  AuditEventType,
+  AuditLogConfig,
+  AuditTransport,
+  TransportFn,
+  Alert,
+} from "../types.js";
+import type { OTelTransport } from "./otel.js";
+import type { FileTransport } from "./file-transport.js";
+import { AlertingEngine } from "../alerting/index.js";
 
-const DEFAULT_CONFIG: Required<Omit<AuditLogConfig, "alerting">> & {
+/**
+ * Resolved internal config — ensures `transports` is always an array and
+ * all other fields have concrete defaults.
+ */
+interface ResolvedConfig {
+  transports: AuditTransport[];
+  path: string;
+  level: NonNullable<AuditLogConfig["level"]>;
+  redactContent: boolean;
   alerting: AuditLogConfig["alerting"];
-} = {
-  transport: "console",
-  path: "./aegis-audit.jsonl",
-  level: "all",
-  redactContent: false,
-  alerting: undefined,
-};
+}
+
+/**
+ * Merge the legacy single `transport` field with the new `transports` array,
+ * deduplicating entries.
+ */
+function resolveTransports(config: AuditLogConfig): AuditTransport[] {
+  const set = new Set<AuditTransport>();
+
+  if (config.transports) {
+    for (const t of config.transports) {
+      set.add(t);
+    }
+  }
+
+  // Legacy single-transport field: merge it in (but don't duplicate)
+  if (config.transport) {
+    set.add(config.transport);
+  }
+
+  // If nothing was specified at all, default to console
+  if (set.size === 0) {
+    set.add("console");
+  }
+
+  return [...set];
+}
 
 /**
  * Audit Log — records every decision, action, and violation in the pipeline.
  *
- * Supports multiple transports: console, JSON file, OpenTelemetry, or custom.
+ * Supports multiple simultaneous transports: console, JSON file,
+ * OpenTelemetry, or any number of custom transport functions.
  * Every security-relevant event in the Aegis pipeline creates an audit entry.
+ *
+ * @example
+ * ```ts
+ * // Multiple transports active at once
+ * const audit = new AuditLog({
+ *   transports: ['console', 'otel', 'custom'],
+ *   level: 'all',
+ * });
+ *
+ * // Wire OTel
+ * audit.setOTelTransport(otel);
+ *
+ * // Add custom transports
+ * audit.addTransport((entry) => sendToDatadog(entry));
+ * audit.addTransport((entry) => sendToSplunk(entry));
+ * ```
  */
 export class AuditLog {
-  private config: typeof DEFAULT_CONFIG;
+  private config: ResolvedConfig;
   private entries: AuditEntry[] = [];
-  private customTransport?: (entry: AuditEntry) => void | Promise<void>;
+
+  /** Registered custom transport functions. */
+  private customTransports: TransportFn[] = [];
+
+  /** OpenTelemetry transport instance (optional). */
+  private otelTransport?: OTelTransport;
+
+  /** JSON-Lines file transport instance (optional). */
+  private fileTransport?: FileTransport;
+
+  /** Alerting engine for evaluating rules against audit entries. */
+  private alertingEngine?: AlertingEngine;
 
   constructor(config: AuditLogConfig = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = {
+      transports: resolveTransports(config),
+      path: config.path ?? "./aegis-audit.jsonl",
+      level: config.level ?? "all",
+      redactContent: config.redactContent ?? false,
+      alerting: config.alerting,
+    };
+
+    // Initialize the alerting engine if alerting is configured and enabled
+    if (this.config.alerting?.enabled && this.config.alerting.rules.length > 0) {
+      this.alertingEngine = new AlertingEngine(this.config.alerting);
+    }
   }
+
+  // ── Transport management ────────────────────────────────────────────────
 
   /**
    * Set a custom transport function for audit entries.
+   *
+   * @deprecated Use {@link addTransport} instead for adding multiple custom
+   * transports. This method is kept for backward compatibility and replaces
+   * all existing custom transports with a single function.
    */
-  setCustomTransport(fn: (entry: AuditEntry) => void | Promise<void>): void {
-    this.customTransport = fn;
+  setCustomTransport(fn: TransportFn): void {
+    this.customTransports = [fn];
   }
+
+  /**
+   * Add a custom transport function.
+   *
+   * Multiple custom transports can be active simultaneously. Each one
+   * receives every audit entry that passes level filtering.
+   */
+  addTransport(fn: TransportFn): void {
+    this.customTransports.push(fn);
+  }
+
+  /**
+   * Remove a previously-added custom transport function.
+   *
+   * Uses reference equality — pass the same function reference that was
+   * originally added.
+   */
+  removeTransport(fn: TransportFn): void {
+    const idx = this.customTransports.indexOf(fn);
+    if (idx !== -1) {
+      this.customTransports.splice(idx, 1);
+    }
+  }
+
+  /**
+   * Wire up an {@link OTelTransport} instance.
+   *
+   * When the `"otel"` transport is active, every audit entry is forwarded
+   * to this transport's `emit()` method.
+   */
+  setOTelTransport(otel: OTelTransport): void {
+    this.otelTransport = otel;
+  }
+
+  /**
+   * Wire up a {@link FileTransport} instance for JSON-Lines file logging.
+   *
+   * When the `"json-file"` transport is active, every audit entry is
+   * forwarded to this transport's `emit()` method.
+   */
+  setFileTransport(file: FileTransport): void {
+    this.fileTransport = file;
+  }
+
+  // ── Logging ─────────────────────────────────────────────────────────────
 
   /**
    * Log an audit entry.
@@ -61,7 +189,14 @@ export class AuditLog {
 
     this.entries.push(full);
     this.emit(full);
+
+    // Evaluate alerting rules against this entry
+    if (this.alertingEngine) {
+      this.alertingEngine.evaluate(full);
+    }
   }
+
+  // ── Querying ────────────────────────────────────────────────────────────
 
   /**
    * Query stored audit entries.
@@ -105,6 +240,26 @@ export class AuditLog {
     this.entries = [];
   }
 
+  /**
+   * Get the alerting engine instance, if alerting is configured.
+   *
+   * @returns The AlertingEngine instance, or null if alerting is not enabled
+   */
+  getAlertingEngine(): AlertingEngine | null {
+    return this.alertingEngine ?? null;
+  }
+
+  /**
+   * Get all active (unresolved) alerts from the alerting engine.
+   *
+   * @returns Array of active alerts, or empty array if alerting is not enabled
+   */
+  getActiveAlerts(): Alert[] {
+    return this.alertingEngine?.getActiveAlerts() ?? [];
+  }
+
+  // ── Private helpers ─────────────────────────────────────────────────────
+
   private shouldLog(entry: AuditEntry): boolean {
     switch (this.config.level) {
       case "violations-only":
@@ -125,23 +280,49 @@ export class AuditLog {
     }
   }
 
+  /**
+   * Dispatch an entry to every active transport.
+   *
+   * Multiple transports can fire simultaneously (e.g., console + otel + custom).
+   */
   private emit(entry: AuditEntry): void {
-    switch (this.config.transport) {
+    for (const transport of this.config.transports) {
+      this.emitToTransport(transport, entry);
+    }
+  }
+
+  /**
+   * Route an entry to a single transport type.
+   */
+  private emitToTransport(transport: AuditTransport, entry: AuditEntry): void {
+    switch (transport) {
       case "console":
         this.emitConsole(entry);
         break;
+
       case "json-file":
-        // File transport will be implemented with Node.js fs
-        // For now, fall through to console
-        this.emitConsole(entry);
-        break;
-      case "custom":
-        if (this.customTransport) {
-          void this.customTransport(entry);
+        if (this.fileTransport) {
+          void this.fileTransport.emit(entry);
+        } else {
+          // Fallback: write JSON to console if no FileTransport is wired
+          this.emitConsole(entry);
         }
         break;
+
       case "otel":
-        // OTel transport will be a separate export
+        if (this.otelTransport) {
+          this.otelTransport.emit(entry);
+        }
+        break;
+
+      case "custom":
+        for (const fn of this.customTransports) {
+          try {
+            void fn(entry);
+          } catch {
+            // Swallow errors from custom transports to avoid breaking the pipeline.
+          }
+        }
         break;
     }
   }

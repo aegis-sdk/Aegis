@@ -1,7 +1,7 @@
 {
-  "name": "@aegis-sdk/openai",
+  "name": "@aegis-sdk/sveltekit",
   "version": "0.3.0",
-  "description": "OpenAI SDK adapter for Aegis prompt injection defense",
+  "description": "SvelteKit hooks and handle adapter for Aegis prompt injection defense",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -30,10 +30,20 @@
   },
   "peerDependencies": {
     "@aegis-sdk/core": "workspace:*",
-    "openai": ">=4.0.0"
+    "@sveltejs/kit": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@sveltejs/kit": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@aegis-sdk/core": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aegis-sdk/aegis",
+    "directory": "packages/sveltekit"
   },
   "engines": {
     "node": ">=18.0.0"

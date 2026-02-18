@@ -1,0 +1,47 @@
+{
+  "name": "@aegis-sdk/cli",
+  "version": "0.3.0",
+  "description": "CLI tool for testing and scanning with Aegis prompt injection defense",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "aegis": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/cli.d.ts",
+        "default": "./dist/cli.js"
+      },
+      "require": {
+        "types": "./dist/cli.d.cts",
+        "default": "./dist/cli.cjs"
+      }
+    }
+  },
+  "main": "./dist/cli.cjs",
+  "module": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@aegis-sdk/core": "workspace:*",
+    "@aegis-sdk/testing": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aegis-sdk/aegis",
+    "directory": "packages/cli"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "sideEffects": false
+}

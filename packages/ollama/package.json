@@ -1,7 +1,7 @@
 {
-  "name": "@aegis-sdk/openai",
+  "name": "@aegis-sdk/ollama",
   "version": "0.3.0",
-  "description": "OpenAI SDK adapter for Aegis prompt injection defense",
+  "description": "Ollama SDK adapter for Aegis prompt injection defense",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -30,7 +30,7 @@
   },
   "peerDependencies": {
     "@aegis-sdk/core": "workspace:*",
-    "openai": ">=4.0.0"
+    "ollama": ">=0.5.0"
   },
   "dependencies": {
     "@aegis-sdk/core": "workspace:*"
