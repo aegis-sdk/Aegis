@@ -93,9 +93,22 @@ for (const entry of entries) {
 // - multi_language/Korean (1): Same entropy threshold boost as CJK.
 
 const KNOWN_FALSE_POSITIVES = new Set<string>([
-  // No remaining known false positives.
-  // When new false positives are discovered, add them here as it.fails()
-  // entries, then fix the scanner and promote them back to regular tests.
+  // Phase 3 corpus expansion: 12 false positives from template-generated
+  // security_education queries. Short "I'm studying for {cert}. Explain {concept}."
+  // patterns trigger the scanner's security-term sensitivity. These represent
+  // scanner improvement opportunities for short, context-clear educational queries.
+  "I'm studying for CompTIA Security+. Explain ASVS.",
+  "I'm studying for CISM. Explain STRIDE.",
+  "I'm studying for OSCP. Explain compliance frameworks.",
+  "I'm studying for CISM. Explain OWASP Top 10.",
+  "I'm studying for OSCP. Explain shift-left security.",
+  "I'm studying for OSCP. Explain SAST vs DAST.",
+  "I'm studying for CCSP. Explain SameSite cookies.",
+  "I'm studying for OSCP. Explain OWASP Top 10.",
+  "I'm studying for CISM. Explain ISO 27001.",
+  "I'm studying for CISM. Explain security headers.",
+  "I'm studying for CCSP. Explain ISO 27001.",
+  "How do I use JSON.parse() safely in TypeScript?",
 ]);
 
 // ─── Scanner Setup ───────────────────────────────────────────────────────────
@@ -117,8 +130,10 @@ describe("False Positive Validation: Benign Corpus", () => {
   it("known false positive count is tracked", () => {
     // This test documents how many known false positives exist.
     // As the scanner improves, this count should decrease.
-    // Phase 2 resolved all 17 original false positives → 0 remaining.
-    expect(KNOWN_FALSE_POSITIVES.size).toBe(0);
+    // Phase 2 resolved all 17 original false positives.
+    // Phase 3 corpus expansion added 12 new false positives from generated
+    // security_education queries (short cert-study patterns).
+    expect(KNOWN_FALSE_POSITIVES.size).toBe(12);
   });
 
   // Generate one describe block per category

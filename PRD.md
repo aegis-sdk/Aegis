@@ -2362,80 +2362,80 @@ aegis/
 
 ## 19. Roadmap
 
-### Phase 0: Foundation (Weeks 1-2)
+### Phase 0: Foundation (Weeks 1-2) — COMPLETE
 
-- [ ] Verify name availability (npm, GitHub, domain)
-- [ ] Set up monorepo with pnpm workspaces
-- [ ] TypeScript config, ESLint, Prettier, Vitest
-- [ ] CI/CD pipeline (GitHub Actions) — including adversarial test jobs
-- [ ] Basic README and contributing guide
-- [ ] `HALL_OF_FAME.md` and Aegis Protocol documentation
+- [x] Verify name availability (npm, GitHub, domain)
+- [x] Set up monorepo with pnpm workspaces
+- [x] TypeScript config, ESLint, Prettier, Vitest
+- [x] CI/CD pipeline (GitHub Actions) — including adversarial test jobs
+- [x] Basic README and contributing guide
+- [x] `HALL_OF_FAME.md` and Aegis Protocol documentation
 
-### Phase 1a: Core Modules (Weeks 3-6) — v0.1.0-alpha
+### Phase 1a: Core Modules (Weeks 3-6) — v0.1.0-alpha — COMPLETE
 
-- [ ] Quarantine module with TypeScript type safety + `unsafeUnwrap()` guardrails + runtime `Proxy` enforcement
-- [ ] Input Scanner with deterministic pattern matching (sync, <10ms) + cross-chunk sliding window
-- [ ] Entropy analysis for adversarial suffix detection (GCG attacks — T12)
-- [ ] Many-shot jailbreaking detection (T11)
-- [ ] Skeleton key pattern detection (T16)
-- [ ] Prompt Builder with sandwich pattern + configurable delimiter strategies + token budget tracking
-- [ ] **Stream Monitor** (`TransformStream`) with canary token + PII detection + sliding window buffer
-- [ ] Downstream injection payload detection in output (T14)
-- [ ] Markdown/HTML sanitization in output stream
-- [ ] Basic Policy Engine with YAML/JSON config
-- [ ] Basic Audit Logging (JSON file transport)
-- [ ] 15+ injection pattern categories (including virtualization, context flooding, skeleton key, many-shot)
-- [ ] Empirical threshold tuning: run adversarial suite + benign corpus, produce ROC curve, set default threshold
-- [ ] Unit tests + adversarial test suite (Layer 1 + Layer 2)
+- [x] Quarantine module with TypeScript type safety + `unsafeUnwrap()` guardrails + runtime `Proxy` enforcement
+- [x] Input Scanner with deterministic pattern matching (sync, <10ms) + cross-chunk sliding window
+- [x] Entropy analysis for adversarial suffix detection (GCG attacks — T12)
+- [x] Many-shot jailbreaking detection (T11)
+- [x] Skeleton key pattern detection (T16)
+- [x] Prompt Builder with sandwich pattern + configurable delimiter strategies + token budget tracking
+- [x] **Stream Monitor** (`TransformStream`) with canary token + PII detection + sliding window buffer
+- [x] Downstream injection payload detection in output (T14)
+- [x] Markdown/HTML sanitization in output stream
+- [x] Basic Policy Engine with YAML/JSON config
+- [x] Basic Audit Logging (JSON file transport)
+- [x] 15+ injection pattern categories (including virtualization, context flooding, skeleton key, many-shot)
+- [x] Empirical threshold tuning: run adversarial suite + benign corpus, produce ROC curve, set default threshold
+- [x] Unit tests + adversarial test suite (Layer 1 + Layer 2)
 
 ### Phase 1b: Integration + Ship (Weeks 7-9) — v0.1.0
 
-- [ ] **Vercel AI SDK integration** via `experimental_transform` + `wrapLanguageModel()` middleware
-- [ ] `guardInput()` with configurable scan strategy (`last-user`, `all-user`, `full-history`)
-- [ ] Adaptive Sandbox logic with native structured outputs (conditional on risk score)
-- [ ] Kill switch recovery modes (`continue`, `reset-last`, `quarantine-session`, `terminate-session`)
-- [ ] Language detection for language-switching attacks (T18)
-- [ ] 3 preset policies (customer support, code assistant, paranoid)
-- [ ] Benign corpus (5,000 queries from sourcing plan) + false positive CI gate (<0.1%)
-- [ ] Next.js example project (chatbot with streaming protection)
+- [x] **Vercel AI SDK integration** via `experimental_transform` + `wrapLanguageModel()` middleware
+- [x] `guardInput()` with configurable scan strategy (`last-user`, `all-user`, `full-history`)
+- [x] Adaptive Sandbox logic with native structured outputs (conditional on risk score)
+- [x] Kill switch recovery modes (`continue`, `reset-last`, `quarantine-session`, `terminate-session`)
+- [x] Language detection for language-switching attacks (T18)
+- [x] 3 preset policies (customer support, code assistant, paranoid)
+- [ ] Benign corpus (5,000 queries from sourcing plan) + false positive CI gate (<0.1%) — _203 queries implemented, need expansion_
+- [x] Next.js example project (chatbot with streaming protection)
 - [ ] Getting Started documentation
-- [ ] npm publish: `@aegis-sdk/core`, `@aegis-sdk/vercel`
+- [x] npm publish: `@aegis-sdk/core`, `@aegis-sdk/vercel`
 
 ### Phase 2: Action Safety & Ecosystem (Weeks 10-13) — v0.2.0
 
-- [ ] Action Validator with rule-based intent alignment
-- [ ] Rate limiting (including denial-of-wallet detection — T17)
-- [ ] Human-in-the-loop approval gates
-- [ ] MCP parameter validation and tool output quarantine
-- [ ] Agentic loop protection: `guardChainStep()`, step budget, output re-scanning (T14)
-- [ ] LangChain.js adapter (with chain injection protection)
-- [ ] Express middleware
-- [ ] Anthropic + OpenAI direct provider adapters
-- [ ] Output Scanner (expanded PII detection, secret detection)
-- [ ] Expanded pattern database (encoding bypass, multi-language, adversarial suffixes)
-- [ ] Template-based fuzzing with `fast-check` in CI
+- [x] Action Validator with rule-based intent alignment
+- [x] Rate limiting (including denial-of-wallet detection — T17)
+- [x] Human-in-the-loop approval gates
+- [x] MCP parameter validation and tool output quarantine
+- [x] Agentic loop protection: `guardChainStep()`, step budget, output re-scanning (T14)
+- [x] LangChain.js adapter (with chain injection protection)
+- [x] Express middleware
+- [x] Anthropic + OpenAI direct provider adapters
+- [x] Output Scanner (expanded PII detection, secret detection)
+- [x] Expanded pattern database (encoding bypass, multi-language, adversarial suffixes)
+- [x] Template-based fuzzing with `fast-check` in CI
 - [ ] Pattern DB auto-sync script with integrity verification (Promptfoo, OWASP, PyRIT, MITRE ATLAS)
 - [ ] MCP server integration guide
-- [ ] npm publish: `@aegis-sdk/langchain`, `@aegis-sdk/express`, `@aegis-sdk/anthropic`, `@aegis-sdk/openai`
+- [x] npm publish: `@aegis-sdk/langchain`, `@aegis-sdk/express`, `@aegis-sdk/anthropic`, `@aegis-sdk/openai`
 
 ### Phase 3: Testing & Intelligence (Weeks 14-17) — v0.3.0
 
-- [ ] Red Team Scanner with full attack suites
-- [ ] CI/CD test runner (`npx aegis test`)
-- [ ] Conversation trajectory analysis for Crescendo attack detection (T7)
-- [ ] Client-side message integrity (HMAC signing — T15)
-- [ ] Privilege decay for agentic chains
-- [ ] OpenTelemetry integration (spans, metrics, log records)
-- [ ] Alerting engine (rate-based, session-based, cost-based alerts)
-- [ ] SvelteKit middleware
-- [ ] Hono/Fastify middleware
-- [ ] Google/Mistral/Ollama adapters
+- [x] Red Team Scanner with full attack suites
+- [x] CI/CD test runner (`npx aegis test`)
+- [x] Conversation trajectory analysis for Crescendo attack detection (T7)
+- [x] Client-side message integrity (HMAC signing — T15)
+- [x] Privilege decay for agentic chains
+- [x] OpenTelemetry integration (spans, metrics, log records)
+- [x] Alerting engine (rate-based, session-based, cost-based alerts)
+- [x] SvelteKit middleware
+- [x] Hono middleware — _Fastify not yet implemented_
+- [x] Google/Mistral/Ollama adapters
 - [ ] Embedding-based intent alignment (optional)
 - [ ] Embedding-based trajectory drift detection (optional)
-- [ ] Custom transport for audit logging
-- [ ] Promptfoo compatibility layer
+- [x] Custom transport for audit logging
+- [x] Promptfoo compatibility layer
 - [ ] Documentation site (VitePress or Starlight)
-- [ ] npm publish: `@aegis-sdk/testing`, `@aegis-sdk/cli`, `@aegis-sdk/sveltekit`, `@aegis-sdk/hono`
+- [ ] npm publish: `@aegis-sdk/testing`, `@aegis-sdk/cli`, `@aegis-sdk/sveltekit`, `@aegis-sdk/hono` — _testing + hono published; cli + sveltekit pending_
 
 ### Phase 4: Advanced (Weeks 18-23) — v0.4.0
 

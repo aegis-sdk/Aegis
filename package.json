@@ -23,7 +23,8 @@
     "clean": "pnpm -r run clean && rm -rf node_modules",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && changeset publish",
+    "sync-patterns": "tsx scripts/sync-patterns.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -38,6 +39,7 @@
     "fast-check": "^4.5.3",
     "prettier": "^3.8.1",
     "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.0",
     "vitest": "^4.0.18"

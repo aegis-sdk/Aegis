@@ -1,0 +1,21 @@
+{
+  "lastSync": null,
+  "sources": {
+    "promptfoo": {
+      "hash": null,
+      "url": "https://raw.githubusercontent.com/promptfoo/promptfoo/main/src/redteam/strategies/promptInjections/data.ts",
+      "lastFetched": null
+    },
+    "owasp": {
+      "hash": null,
+      "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+      "lastFetched": null
+    },
+    "aegis-community": {
+      "hash": null,
+      "url": "https://raw.githubusercontent.com/aegis-sdk/patterns/main/community.json",
+      "lastFetched": null
+    }
+  },
+  "totalPatterns": 0
+}
