@@ -2,10 +2,10 @@
 
 # Aegis.js — The Streaming-First Defense Layer for AI
 
-**Version:** 3.0 (Comprehensive Threat Coverage + Compliance)
+**Version:** 3.1 (Post-Phase 3 Audit)
 **Author:** Josh + Claude
-**Date:** February 17, 2026
-**Status:** Pre-Development / Architecture Locked
+**Date:** February 18, 2026
+**Status:** v0.3.0 Shipped / Phase 3 Complete — Ready for Phase 4
 **Package Scope:** `@aegis-sdk/core`
 
 ---
@@ -1662,18 +1662,18 @@ interface ProviderAdapter {
 }
 ```
 
-### 11.3 Priority Order
+### 11.3 Provider Adapters
 
-| Target | Package | Priority | Notes |
+| Target | Package | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **Vercel AI SDK (`ai`)** | `@aegis-sdk/vercel` | **P0** | Covers OpenAI, Anthropic, Mistral, etc. for Next.js users |
-| **LangChain.js** | `@aegis-sdk/langchain` | **P1** | For agentic workflows |
-| Direct Anthropic SDK | `@aegis-sdk/anthropic` | P2 | Backend scripts not using frameworks |
-| Direct OpenAI SDK | `@aegis-sdk/openai` | P2 | Backend scripts not using frameworks |
-| Google (Gemini) | `@aegis-sdk/google` | P3 | |
-| Mistral | `@aegis-sdk/mistral` | P3 | |
-| Ollama (local models) | `@aegis-sdk/ollama` | P3 | |
-| Custom/Generic | `@aegis-sdk/core` (built-in) | P0 | Always available |
+| **Vercel AI SDK (`ai`)** | `@aegis-sdk/vercel` | **Shipped** | Covers OpenAI, Anthropic, Mistral, etc. for Next.js users |
+| **LangChain.js** | `@aegis-sdk/langchain` | **Shipped** | For agentic workflows |
+| Direct Anthropic SDK | `@aegis-sdk/anthropic` | **Shipped** | Backend scripts not using frameworks |
+| Direct OpenAI SDK | `@aegis-sdk/openai` | **Shipped** | Backend scripts not using frameworks |
+| Google (Gemini) | `@aegis-sdk/google` | **Shipped** | |
+| Mistral | `@aegis-sdk/mistral` | **Shipped** | |
+| Ollama (local models) | `@aegis-sdk/ollama` | **Shipped** | |
+| Custom/Generic | `@aegis-sdk/core` (built-in) | **Shipped** | Always available |
 
 ### 11.4 Bring Your Own Provider
 
@@ -1718,16 +1718,16 @@ app.post('/chat', async (req, res) => {
 });
 ```
 
-### 12.3 Planned Framework Adapters
+### 12.3 Framework Adapters
 
-| Framework | Package | Priority |
+| Framework | Package | Status |
 | :--- | :--- | :--- |
-| Express | `@aegis-sdk/express` | v0.1 |
-| Hono | `@aegis-sdk/hono` | v0.2 |
-| Fastify | `@aegis-sdk/fastify` | v0.2 |
-| Next.js (API routes) | `@aegis-sdk/next` | v0.1 |
-| SvelteKit (actions/load) | `@aegis-sdk/sveltekit` | v0.2 |
-| Koa | `@aegis-sdk/koa` | v0.3 |
+| Express | `@aegis-sdk/express` | Shipped (v0.1) |
+| Hono | `@aegis-sdk/hono` | Shipped (v0.3) |
+| Fastify | `@aegis-sdk/fastify` | Shipped (v0.3) |
+| Next.js (API routes) | `@aegis-sdk/next` | Shipped (v0.1) |
+| SvelteKit (actions/load) | `@aegis-sdk/sveltekit` | Shipped (v0.3) |
+| Koa | `@aegis-sdk/koa` | Not started |
 
 ---
 
@@ -2289,13 +2289,15 @@ aegis/
 │   ├── core/                    # Main library (all modules)
 │   │   ├── src/
 │   │   │   ├── quarantine/      # Quarantine module
-│   │   │   ├── scanner/         # Input scanner
+│   │   │   ├── scanner/         # Input scanner + trajectory analyzer
 │   │   │   ├── builder/         # Prompt builder
 │   │   │   ├── policy/          # Policy engine
 │   │   │   ├── validator/       # Action validator
 │   │   │   ├── sandbox/         # Sandbox runner
 │   │   │   ├── monitor/         # Stream monitor (TransformStream)
-│   │   │   ├── audit/           # Audit logging
+│   │   │   ├── audit/           # Audit logging (console, file, OTel transports)
+│   │   │   ├── alerting/        # Real-time alerting engine
+│   │   │   ├── integrity/       # HMAC message signing (T15)
 │   │   │   ├── presets/         # Preset policies
 │   │   │   └── index.ts         # Main exports
 │   │   ├── patterns/            # Injection pattern database (JSON)
@@ -2305,58 +2307,68 @@ aegis/
 │   ├── langchain/               # LangChain integration
 │   ├── anthropic/               # Anthropic provider adapter
 │   ├── openai/                  # OpenAI provider adapter
+│   ├── google/                  # Google Gemini adapter
+│   ├── mistral/                 # Mistral adapter
+│   ├── ollama/                  # Ollama (local models) adapter
 │   ├── express/                 # Express middleware
+│   ├── fastify/                 # Fastify plugin
 │   ├── next/                    # Next.js integration
 │   ├── hono/                    # Hono middleware
 │   ├── sveltekit/               # SvelteKit integration
-│   ├── testing/                 # Red team & testing tools
-│   └── cli/                     # CLI tool
+│   ├── testing/                 # Red team & testing tools + Promptfoo compat
+│   ├── cli/                     # CLI tool (scaffold)
+│   └── docs/                    # VitePress documentation site
 │
-├── docs/                        # Documentation site
+├── docs/                        # Standalone docs (getting-started, MCP guide)
 │   ├── getting-started.md
+│   ├── mcp-integration.md
 │   ├── guides/
-│   │   ├── nextjs-vercel-ai.md  # Primary getting started guide
-│   │   ├── customer-support-bot.md
-│   │   ├── rag-system.md
-│   │   ├── ai-agent-with-tools.md
-│   │   └── migrating-existing-app.md
 │   └── api-reference/
 │
 ├── examples/                    # Working example projects
 │   ├── nextjs-chatbot/          # Vercel AI SDK example (P0)
 │   ├── express-chatbot/
-│   ├── nextjs-rag/
-│   ├── sveltekit-agent/
-│   └── mcp-server/
+│   └── sveltekit-agent/
+│
+├── scripts/                     # Build & maintenance scripts
+│   ├── sync-patterns.ts         # Pattern DB auto-sync with integrity verification
+│   ├── pattern-manifest.json    # Pattern source manifest
+│   └── generate-corpus.py       # Benign corpus generation
 │
 ├── tests/
-│   ├── unit/                    # Standard unit tests
+│   ├── unit/                    # Standard unit tests (26 files, 3619 tests)
 │   ├── adversarial/             # Known attack patterns
 │   │   ├── bypasses/            # Community-submitted bypass tests (The Protocol)
 │   │   └── suites/              # Categorized attack suites
-│   ├── benign/                  # Benign corpus (false positive tests)
+│   ├── benign/                  # Benign corpus (3,184 queries, false positive tests)
 │   ├── fuzz/                    # Template-based fuzzing (fast-check)
 │   └── integration/             # Stream interception, end-to-end
 │
 ├── benchmarks/                  # Performance benchmarks
 ├── HALL_OF_FAME.md              # Community bypass contributors
 ├── aegis-policy.schema.json     # JSON Schema for policy validation
-└── package.json                 # Monorepo root (pnpm workspaces)
+└── package.json                 # Monorepo root (pnpm 10 workspaces)
 ```
 
 ### 18.2 npm Packages
 
-| Package | Description |
-| :--- | :--- |
-| `@aegis-sdk/core` | Core library — all modules, zero provider dependencies |
-| `@aegis-sdk/vercel` | Vercel AI SDK integration (P0) |
-| `@aegis-sdk/langchain` | LangChain.js integration |
-| `@aegis-sdk/anthropic` | Anthropic Claude adapter |
-| `@aegis-sdk/openai` | OpenAI adapter |
-| `@aegis-sdk/express` | Express middleware |
-| `@aegis-sdk/next` | Next.js integration |
-| `@aegis-sdk/testing` | Red team & testing tools |
-| `@aegis-sdk/cli` | CLI tool for policy validation & testing |
+| Package | Description | Status |
+| :--- | :--- | :--- |
+| `@aegis-sdk/core` | Core library — all modules, zero provider dependencies | Published |
+| `@aegis-sdk/vercel` | Vercel AI SDK integration (P0) | Published |
+| `@aegis-sdk/langchain` | LangChain.js integration | Published |
+| `@aegis-sdk/anthropic` | Anthropic Claude adapter | Published |
+| `@aegis-sdk/openai` | OpenAI adapter | Published |
+| `@aegis-sdk/google` | Google Gemini adapter | Published |
+| `@aegis-sdk/mistral` | Mistral adapter | Published |
+| `@aegis-sdk/ollama` | Ollama (local models) adapter | Published |
+| `@aegis-sdk/express` | Express middleware | Published |
+| `@aegis-sdk/fastify` | Fastify plugin | Published |
+| `@aegis-sdk/next` | Next.js integration | Published |
+| `@aegis-sdk/hono` | Hono middleware | Published |
+| `@aegis-sdk/sveltekit` | SvelteKit integration | Published |
+| `@aegis-sdk/testing` | Red team & testing tools + Promptfoo compat | Published |
+| `@aegis-sdk/cli` | CLI tool for policy validation & testing | Scaffold only |
 
 ---
 
@@ -2388,7 +2400,7 @@ aegis/
 - [x] Empirical threshold tuning: run adversarial suite + benign corpus, produce ROC curve, set default threshold
 - [x] Unit tests + adversarial test suite (Layer 1 + Layer 2)
 
-### Phase 1b: Integration + Ship (Weeks 7-9) — v0.1.0
+### Phase 1b: Integration + Ship (Weeks 7-9) — v0.1.0 — COMPLETE
 
 - [x] **Vercel AI SDK integration** via `experimental_transform` + `wrapLanguageModel()` middleware
 - [x] `guardInput()` with configurable scan strategy (`last-user`, `all-user`, `full-history`)
@@ -2396,12 +2408,12 @@ aegis/
 - [x] Kill switch recovery modes (`continue`, `reset-last`, `quarantine-session`, `terminate-session`)
 - [x] Language detection for language-switching attacks (T18)
 - [x] 3 preset policies (customer support, code assistant, paranoid)
-- [ ] Benign corpus (5,000 queries from sourcing plan) + false positive CI gate (<0.1%) — _203 queries implemented, need expansion_
+- [~] Benign corpus — _3,184 queries implemented (target was 5,000); false positive CI gate active but corpus expansion still needed_
 - [x] Next.js example project (chatbot with streaming protection)
-- [ ] Getting Started documentation
+- [x] Getting Started documentation — `docs/getting-started.md` + VitePress docs site scaffolded in `packages/docs/`
 - [x] npm publish: `@aegis-sdk/core`, `@aegis-sdk/vercel`
 
-### Phase 2: Action Safety & Ecosystem (Weeks 10-13) — v0.2.0
+### Phase 2: Action Safety & Ecosystem (Weeks 10-13) — v0.2.0 — COMPLETE
 
 - [x] Action Validator with rule-based intent alignment
 - [x] Rate limiting (including denial-of-wallet detection — T17)
@@ -2414,11 +2426,11 @@ aegis/
 - [x] Output Scanner (expanded PII detection, secret detection)
 - [x] Expanded pattern database (encoding bypass, multi-language, adversarial suffixes)
 - [x] Template-based fuzzing with `fast-check` in CI
-- [ ] Pattern DB auto-sync script with integrity verification (Promptfoo, OWASP, PyRIT, MITRE ATLAS)
-- [ ] MCP server integration guide
+- [x] Pattern DB auto-sync script with integrity verification — `scripts/sync-patterns.ts` with `pattern-manifest.json`
+- [x] MCP server integration guide — `docs/mcp-integration.md`
 - [x] npm publish: `@aegis-sdk/langchain`, `@aegis-sdk/express`, `@aegis-sdk/anthropic`, `@aegis-sdk/openai`
 
-### Phase 3: Testing & Intelligence (Weeks 14-17) — v0.3.0
+### Phase 3: Testing & Intelligence (Weeks 14-17) — v0.3.0 — COMPLETE
 
 - [x] Red Team Scanner with full attack suites
 - [x] CI/CD test runner (`npx aegis test`)
@@ -2427,15 +2439,18 @@ aegis/
 - [x] Privilege decay for agentic chains
 - [x] OpenTelemetry integration (spans, metrics, log records)
 - [x] Alerting engine (rate-based, session-based, cost-based alerts)
-- [x] SvelteKit middleware
-- [x] Hono middleware — _Fastify not yet implemented_
-- [x] Google/Mistral/Ollama adapters
-- [ ] Embedding-based intent alignment (optional)
-- [ ] Embedding-based trajectory drift detection (optional)
+- [x] SvelteKit middleware (`@aegis-sdk/sveltekit`)
+- [x] Hono middleware (`@aegis-sdk/hono`)
+- [x] Fastify plugin (`@aegis-sdk/fastify`) — _added beyond original scope_
+- [x] Google/Mistral/Ollama adapters (`@aegis-sdk/google`, `@aegis-sdk/mistral`, `@aegis-sdk/ollama`)
+- [ ] Embedding-based intent alignment (optional) — _deferred to Phase 4_
+- [ ] Embedding-based trajectory drift detection (optional) — _deferred to Phase 4; keyword-based drift implemented_
 - [x] Custom transport for audit logging
-- [x] Promptfoo compatibility layer
-- [ ] Documentation site (VitePress or Starlight)
-- [ ] npm publish: `@aegis-sdk/testing`, `@aegis-sdk/cli`, `@aegis-sdk/sveltekit`, `@aegis-sdk/hono` — _testing + hono published; cli + sveltekit pending_
+- [x] Promptfoo compatibility layer (`@aegis-sdk/testing` promptfoo export)
+- [x] Documentation site — VitePress scaffolded in `packages/docs/` with Getting Started + MCP guides
+- [x] npm publish: `@aegis-sdk/testing`, `@aegis-sdk/sveltekit`, `@aegis-sdk/hono`, `@aegis-sdk/fastify`, `@aegis-sdk/google`, `@aegis-sdk/mistral`, `@aegis-sdk/ollama` — _cli scaffold exists but not yet published_
+- [x] Test coverage above 80/75/80/80 thresholds (96.85% statements, 92.41% branches, 98.64% functions, 97.44% lines)
+- [x] CI fully green (lint, typecheck, tests, coverage, adversarial suite across Node 18/20/22)
 
 ### Phase 4: Advanced (Weeks 18-23) — v0.4.0
 
@@ -2522,26 +2537,29 @@ aegis/
 
 ## 21. Open Questions
 
-These need resolution before or during Phase 1:
+### Resolved
 
-1. **Package name verification.** ~~Confirm `@aegis-sdk/core` is available on npm and `aegis-sdk` org can be claimed on GitHub.~~ **RESOLVED:** Both are available as of 2026-02-17.
+1. **Package name verification.** ~~Confirm `@aegis-sdk/core` is available on npm and `aegis-sdk` org can be claimed on GitHub.~~ **RESOLVED:** Both claimed. npm org: `@aegis-sdk` (owner: msjoshlopez). GitHub org: `aegis-sdk`.
 
-2. **License.** MIT (maximum adoption) vs Apache 2.0 (patent protection) vs AGPL (copyleft). Recommendation: MIT for maximum adoption.
+2. **License.** **RESOLVED:** MIT. Shipped with MIT license for maximum adoption.
 
-3. **Vercel Edge Runtime limits.** Can we bundle the Pattern DB (JSON) into Edge Functions without hitting the 1MB limit? *Plan: Use dynamic imports or a hosted pattern API for Edge.*
+5. **Pattern database maintenance.** **RESOLVED:** Both approaches. `scripts/sync-patterns.ts` auto-syncs from Promptfoo, OWASP, PyRIT, and MITRE ATLAS with SHA-256 integrity verification. Community contributions via The Aegis Protocol (bypass PRs).
 
-4. **Context window inflation.** Does the "Sandwich Defense" degrade model performance on smaller models (Llama-8b)? *Plan: Benchmarks with compact mode fallback.*
+8. **Runtime vs compile-time enforcement.** **RESOLVED:** Shipped with `Proxy`-based runtime enforcement on `Quarantined<T>`. `unsafeUnwrap()` requires a reason string and creates an audit entry.
 
-5. **Pattern database maintenance.** How do we keep the injection pattern database current? Community contributions with review? Automated sync from public datasets? Both?
+12. **Message integrity storage.** **RESOLVED:** HMAC secret via environment variable (simplest path). `MessageSigner` class uses Web Crypto API (SubtleCrypto) with fallback for non-crypto environments. Secret passed via `AegisConfig.integrity.secret`.
 
-6. **ML features — bundled vs API?** Should the optional ML classifier be a bundled model (larger package, works offline) or an API call to a hosted model (smaller package, requires internet)? Or both?
+13. **Agentic loop integration depth.** **RESOLVED:** Both. Standalone `guardChainStep()` on the `Aegis` class for portability, plus dedicated `@aegis-sdk/langchain` adapter that wires into LangChain's callback system.
 
-7. **Sandbox model cost.** The sandbox pattern requires an additional LLM call for high-risk inputs. For high-volume applications, should we offer a local model option (Ollama) as a cost-effective alternative?
+### Still Open (Phase 4+)
 
-8. **Runtime vs compile-time enforcement.** TypeScript's type system only works at compile time. JavaScript users get no quarantine safety. **Resolution:** Aegis ships with two runtime enforcement modes, configurable via `runtimeEnforcement` in the Aegis config:
-   - `strict` (default): `Quarantined<T>.value` access and direct string coercion throw a `QuarantineViolationError` at runtime. This catches JS developers who bypass the type system.
-   - `warn`: Same violations emit `console.warn` and create audit log entries, but do not throw. Useful for gradual migration of legacy codebases.
-   - Runtime enforcement is implemented via `Proxy` objects that trap property access and `Symbol.toPrimitive` / `toString` calls on `Quarantined<T>` values.
+3. **Vercel Edge Runtime limits.** Can we bundle the Pattern DB (JSON) into Edge Functions without hitting the 1MB limit? *Plan: Use dynamic imports or a hosted pattern API for Edge.* — Not yet tested at scale.
+
+4. **Context window inflation.** Does the "Sandwich Defense" degrade model performance on smaller models (Llama-8b)? *Plan: Benchmarks with compact mode fallback.* — Needs benchmarking.
+
+6. **ML features — bundled vs API?** Should the optional ML classifier be a bundled model (larger package, works offline) or an API call to a hosted model (smaller package, requires internet)? Or both? — Deferred to Phase 4.
+
+7. **Sandbox model cost.** The sandbox pattern requires an additional LLM call for high-risk inputs. For high-volume applications, should we offer a local model option (Ollama) as a cost-effective alternative? — `@aegis-sdk/ollama` adapter exists; sandbox wiring is Phase 4.
 
 9. **Community governance.** BDFL initially, transitioning to a steering committee as the community grows?
 
@@ -2549,13 +2567,9 @@ These need resolution before or during Phase 1:
 
 11. **Perplexity model bundling.** The perplexity estimator requires a lightweight language model (~500KB). Should it be bundled in core (increases bundle size but works offline) or distributed as a separate `@aegis-sdk/perplexity` package? Edge Runtime compatibility is a concern.
 
-12. **Message integrity storage.** HMAC-based message signing requires the server to verify signatures on subsequent requests. For stateless API routes (common in Next.js), where should the HMAC secret live? Environment variable (simplest), per-session key (more secure), or external store (Redis)?
-
-13. **Agentic loop integration depth.** How tightly should Aegis integrate with LangChain's callback system vs. providing a standalone `guardChainStep()` function? Tight integration = better DX but coupling risk. Standalone = more portable but requires manual wiring.
-
 14. **Telemetry trust model.** If we build anonymous threat intelligence telemetry, how do we prevent a malicious actor from flooding the telemetry endpoint with false data to corrupt the community threat landscape? Rate limiting per API key? Proof-of-work? Reputation-based weighting?
 
-15. **Entropy threshold calibration.** The adversarial suffix entropy detector needs a per-language baseline (entropy varies significantly across languages). Should we ship baseline entropy profiles for major languages, or calculate them dynamically from the conversation?
+15. **Entropy threshold calibration.** The adversarial suffix entropy detector needs a per-language baseline (entropy varies significantly across languages). Should we ship baseline entropy profiles for major languages, or calculate them dynamically from the conversation? — Partially addressed: `analyzeEntropy()` shipped with configurable threshold, but per-language baselines not yet implemented.
 
 ---
 

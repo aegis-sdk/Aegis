@@ -10,26 +10,32 @@ Aegis.js (`@aegis-sdk/core`) is a streaming-first prompt injection defense libra
 aegis/
 ├── packages/
 │   ├── core/          # Main library — all defense modules
-│   ├── vercel/        # Vercel AI SDK integration (P0)
-│   ├── testing/       # Red team testing tools & attack suites
-│   ├── langchain/     # LangChain.js integration (future)
-│   ├── anthropic/     # Anthropic adapter (future)
-│   ├── openai/        # OpenAI adapter (future)
-│   ├── express/       # Express middleware (future)
-│   ├── next/          # Next.js integration (future)
-│   ├── hono/          # Hono middleware (future)
-│   ├── sveltekit/     # SvelteKit integration (future)
-│   └── cli/           # CLI tool (future)
+│   ├── vercel/        # Vercel AI SDK integration
+│   ├── testing/       # Red team testing tools, attack suites, Promptfoo compat
+│   ├── langchain/     # LangChain.js integration
+│   ├── anthropic/     # Anthropic adapter
+│   ├── openai/        # OpenAI adapter
+│   ├── google/        # Google Gemini adapter
+│   ├── mistral/       # Mistral adapter
+│   ├── ollama/        # Ollama (local models) adapter
+│   ├── express/       # Express middleware
+│   ├── fastify/       # Fastify plugin
+│   ├── next/          # Next.js integration
+│   ├── hono/          # Hono middleware
+│   ├── sveltekit/     # SvelteKit integration
+│   ├── cli/           # CLI tool (scaffold)
+│   └── docs/          # VitePress documentation site
 ├── tests/
-│   ├── unit/          # Unit tests for all modules
+│   ├── unit/          # Unit tests (26 files, 3619 tests)
 │   ├── adversarial/   # Known attack pattern tests
-│   ├── benign/        # False positive prevention tests
-│   ├── fuzz/          # Template-based fuzzing
+│   ├── benign/        # False positive prevention tests (3,184 queries)
+│   ├── fuzz/          # Template-based fuzzing (fast-check)
 │   └── integration/   # End-to-end tests
-├── docs/              # Documentation
+├── scripts/           # Pattern sync, corpus generation
+├── docs/              # Standalone documentation (getting-started, MCP guide)
 ├── examples/          # Working example projects
 ├── benchmarks/        # Performance benchmarks
-└── PRD.md             # Product Requirements Document (v3.0)
+└── PRD.md             # Product Requirements Document (v3.1)
 ```
 
 ## Key Commands
@@ -54,12 +60,17 @@ pnpm typecheck        # TypeScript type checking
 |--------|---------|------|
 | **Quarantine** | Taint-tracking for untrusted content | `src/quarantine/index.ts` |
 | **InputScanner** | Pattern matching + heuristic injection detection | `src/scanner/index.ts` |
+| **TrajectoryAnalyzer** | Crescendo/multi-turn attack detection (T7) | `src/scanner/trajectory.ts` |
 | **PromptBuilder** | Sandwich pattern prompt construction | `src/builder/index.ts` |
 | **PolicyEngine** | Declarative security policy (CSP for AI) | `src/policy/index.ts` |
-| **ActionValidator** | Tool call validation + rate limiting | `src/validator/index.ts` |
+| **ActionValidator** | Tool call validation + rate limiting + DoW detection | `src/validator/index.ts` |
 | **StreamMonitor** | Real-time output scanning (TransformStream) | `src/monitor/index.ts` |
 | **Sandbox** | Zero-capability model for untrusted content | `src/sandbox/index.ts` |
-| **AuditLog** | Security event logging | `src/audit/index.ts` |
+| **AuditLog** | Security event logging (console, file, OTel) | `src/audit/index.ts` |
+| **FileTransport** | JSONL file transport with rotation | `src/audit/file-transport.ts` |
+| **OTelTransport** | OpenTelemetry spans/metrics/logs transport | `src/audit/otel.ts` |
+| **AlertingEngine** | Real-time alerting (rate-spike, session-kills, etc.) | `src/alerting/index.ts` |
+| **MessageSigner** | HMAC conversation integrity (T15) | `src/integrity/index.ts` |
 
 ### Defense Pipeline
 
@@ -84,11 +95,15 @@ User Input → Quarantine → Input Scanner → [Adaptive Sandbox] → Prompt Bu
 
 ## Testing
 
-- Test framework: **Vitest** (globals mode)
+- Test framework: **Vitest 4** (globals mode)
 - Tests live in `tests/` directory (not co-located with source)
+- 26 test files, 3,619 tests passing
 - Adversarial tests in `tests/adversarial/` verify detection of known attacks
-- Benign corpus in `tests/benign/` prevents false positives
+- Benign corpus in `tests/benign/` prevents false positives (3,184 queries)
+- Template-based fuzzing with `fast-check` in `tests/fuzz/`
 - Coverage thresholds: 80% statements, 75% branches, 80% functions, 80% lines
+- Current coverage: 96.85% / 92.41% / 98.64% / 97.44%
+- CI runs tests across Node 18, 20, and 22
 
 ## Package Scope
 
