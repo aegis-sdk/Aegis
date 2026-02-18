@@ -44,10 +44,7 @@ export class FileTransport {
 
   constructor(config: FileTransportConfig) {
     // Guard: Node.js environment check
-    if (
-      typeof globalThis.process === "undefined" ||
-      typeof globalThis.process.versions?.node === "undefined"
-    ) {
+    if (typeof process === "undefined" || typeof process.versions?.node === "undefined") {
       throw new Error(
         "[aegis] FileTransport requires a Node.js runtime. " +
           "It cannot be used in Edge or browser environments. " +
@@ -98,13 +95,15 @@ export class FileTransport {
    */
   private async loadFs(): Promise<void> {
     try {
-      // Try the `node:` protocol first (Node >= 14.18)
-      const mod = (await import("node:fs")) as FsLike;
+      // Use a string variable so TypeScript does not attempt to resolve the
+      // module during DTS generation (only string-literal imports are resolved).
+      const nodeFs = "node:fs";
+      const mod = (await import(nodeFs)) as FsLike;
       this.fsModule = mod;
     } catch {
       try {
-        // Fallback to bare specifier
-        const mod = (await import("fs")) as FsLike;
+        const bareFs = "fs";
+        const mod = (await import(bareFs)) as FsLike;
         this.fsModule = mod;
       } catch {
         // Will be surfaced in emit()

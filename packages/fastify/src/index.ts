@@ -362,9 +362,7 @@ export function getAuditLog(aegis: Aegis): AuditLog {
 // ─── Internal Helpers ───────────────────────────────────────────────────────
 
 /** Type guard to distinguish AegisPluginOptions from a plain AegisConfig. */
-function isPluginOptions(
-  value: AegisPluginOptions | AegisConfig,
-): value is AegisPluginOptions {
+function isPluginOptions(value: AegisPluginOptions | AegisConfig): value is AegisPluginOptions {
   return (
     "aegis" in value ||
     "messagesProperty" in value ||

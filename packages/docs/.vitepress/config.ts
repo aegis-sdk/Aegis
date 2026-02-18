@@ -2,8 +2,7 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   title: "Aegis SDK",
-  description:
-    "Streaming-first prompt injection defense for JavaScript & TypeScript",
+  description: "Streaming-first prompt injection defense for JavaScript & TypeScript",
 
   head: [
     ["meta", { name: "theme-color", content: "#646cff" }],
@@ -13,8 +12,7 @@ export default defineConfig({
       "meta",
       {
         name: "og:description",
-        content:
-          "Streaming-first prompt injection defense for JavaScript & TypeScript",
+        content: "Streaming-first prompt injection defense for JavaScript & TypeScript",
       },
     ],
   ],
@@ -139,9 +137,7 @@ export default defineConfig({
       ],
     },
 
-    socialLinks: [
-      { icon: "github", link: "https://github.com/aegis-sdk/Aegis" },
-    ],
+    socialLinks: [{ icon: "github", link: "https://github.com/aegis-sdk/Aegis" }],
 
     footer: {
       message: "Released under the MIT License.",
@@ -153,8 +149,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern:
-        "https://github.com/aegis-sdk/Aegis/edit/main/packages/docs/:path",
+      pattern: "https://github.com/aegis-sdk/Aegis/edit/main/packages/docs/:path",
       text: "Edit this page on GitHub",
     },
   },
