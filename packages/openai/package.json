@@ -1,6 +1,6 @@
 {
   "name": "@aegis-sdk/openai",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "OpenAI SDK adapter for Aegis prompt injection defense",
   "license": "MIT",
   "type": "module",

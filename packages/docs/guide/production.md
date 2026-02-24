@@ -1,3 +1,8 @@
+---
+title: Production Deployment
+description: Security checklist, monitoring, alerting, performance tuning, and operational guidance for deploying Aegis SDK in production.
+---
+
 # Production Deployment Guide
 
 This guide covers what you need to configure, monitor, and harden before deploying Aegis to production.
@@ -16,6 +21,23 @@ Before going live, verify each of these items:
 8. **Rate limiting active** — Set `limits` in your policy for expensive or destructive tools.
 9. **Secrets rotated** — The HMAC secret and any API keys for the LLM Judge should be rotated regularly.
 10. **Red team tests passing** — Run `npx aegis red-team --policy <your-policy>` and verify your detection rate is acceptable.
+
+---
+
+## Policy Selection by Use Case
+
+Choosing the right policy preset (or building a custom policy) is the most impactful decision for balancing security and usability. Here is a guide for common application types.
+
+| Application Type | Recommended Policy | PII Handling | Key Considerations |
+|------------------|-------------------|-------------|-------------------|
+| Banking / financial services | `strict` or custom | `block` | Block all PII in output, deny all tools except explicitly approved ones, enable injection payload detection, audit everything |
+| Customer support chatbot | `customer-support` | `redact` | Allowlist safe tools (KB search, ticket creation), require approval for refunds, rate limit ticket creation |
+| Creative writing / content generation | `permissive` or `balanced` | `allow` | Users intentionally write long, unusual text -- raise scanner thresholds to reduce false positives, use permissive sensitivity |
+| Code assistant | `code-assistant` | `allow` | Code contains patterns that look like injections (SQL, shell commands) -- disable injection payload detection in output, raise perplexity threshold |
+| Healthcare / HIPAA-aware | `strict` or custom | `block` | Block all PII, enable full audit logging with file transport for compliance records, enable content redaction in audit entries |
+| Internal tool / admin dashboard | `balanced` | `redact` | Users are authenticated employees -- `balanced` is sufficient, but still enable exfiltration prevention and tool rate limits |
+
+For complete, copy-paste-ready policy configurations for each of these use cases, see [Policy Examples](/guide/policy-examples).
 
 ---
 

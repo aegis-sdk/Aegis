@@ -17,8 +17,14 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for full details.
 
 *Be the first to find a bypass and earn your spot here.*
 
-<!-- FORMAT:
 | Name | GitHub | Bypass | Date | Severity |
 |------|--------|--------|------|----------|
-| Jane Doe | @janedoe | Encoding chain bypass (T9) | 2026-03-01 | High |
--->
+| *Your name here* | -- | -- | -- | -- |
+
+## Recognition Tiers
+
+| Tier | Criteria | Badge |
+|------|----------|-------|
+| **Bronze** | 1 accepted bypass | Aegis Contributor |
+| **Silver** | 3 accepted bypasses or 1 critical severity | Aegis Researcher |
+| **Gold** | 5+ accepted bypasses or novel category discovery | Aegis Red Team |

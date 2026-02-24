@@ -1,0 +1,23 @@
+{
+  "name": "aegis-express-chatbot",
+  "version": "0.0.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "express": "^5",
+    "openai": "^4",
+    "@aegis-sdk/core": "workspace:*",
+    "@aegis-sdk/express": "workspace:*",
+    "@aegis-sdk/openai": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/express": "^5",
+    "@types/node": "^22",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}

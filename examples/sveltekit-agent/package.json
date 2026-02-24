@@ -1,0 +1,21 @@
+{
+  "name": "aegis-sveltekit-agent",
+  "version": "0.0.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@aegis-sdk/core": "workspace:*",
+    "openai": "^4"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-auto": "^4",
+    "@sveltejs/kit": "^2",
+    "svelte": "^5",
+    "typescript": "^5",
+    "vite": "^6"
+  }
+}

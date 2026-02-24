@@ -40,6 +40,7 @@ export default defineConfig({
               text: "Production Deployment",
               link: "/guide/production",
             },
+            { text: "Comparison", link: "/guide/comparison" },
           ],
         },
         {
@@ -50,6 +51,10 @@ export default defineConfig({
             { text: "Stream Monitor", link: "/guide/stream-monitor" },
             { text: "Prompt Builder", link: "/guide/prompt-builder" },
             { text: "Policy Engine", link: "/guide/policy-engine" },
+            {
+              text: "Policy Examples",
+              link: "/guide/policy-examples",
+            },
             { text: "Action Validator", link: "/guide/action-validator" },
             { text: "Audit Log", link: "/guide/audit-log" },
             { text: "Sandbox", link: "/guide/sandbox" },

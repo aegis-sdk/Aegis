@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "capabilities": "not-an-object",
+  "input": {
+    "maxLength": -1
+  }
+}

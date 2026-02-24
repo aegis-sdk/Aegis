@@ -1,0 +1,37 @@
+version: 1
+
+capabilities:
+  allow:
+    - search_kb
+    - create_ticket
+  deny:
+    - "delete_*"
+  requireApproval:
+    - issue_refund
+
+limits: {}
+
+input:
+  maxLength: 4000
+  blockPatterns: []
+  requireQuarantine: true
+  encodingNormalization: true
+
+output:
+  maxLength: 8000
+  blockPatterns: []
+  redactPatterns: []
+  detectPII: true
+  detectCanary: true
+  blockOnLeak: true
+  detectInjectionPayloads: false
+  sanitizeMarkdown: false
+
+alignment:
+  enabled: true
+  strictness: medium
+
+dataFlow:
+  piiHandling: redact
+  externalDataSources: []
+  noExfiltration: true

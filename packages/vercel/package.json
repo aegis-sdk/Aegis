@@ -1,6 +1,6 @@
 {
   "name": "@aegis-sdk/vercel",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "description": "Aegis integration for the Vercel AI SDK",
   "license": "MIT",
   "type": "module",

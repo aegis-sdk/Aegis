@@ -432,9 +432,50 @@ export interface StreamViolation {
 
 // ─── Sandbox ─────────────────────────────────────────────────────────────────
 
+/**
+ * The function signature for the sandbox LLM call.
+ *
+ * Takes a fully-constructed prompt string and returns the raw model
+ * response as a string. Provider adapters supply this function —
+ * the sandbox itself is provider-agnostic.
+ */
+export type SandboxCallFn = (prompt: string) => Promise<string>;
+
 export interface SandboxConfig {
-  provider: string;
-  model: string;
+  /**
+   * The LLM call function — provided by a provider adapter.
+   * Takes a prompt string, returns the raw model response as a string.
+   *
+   * This is the only required field. The sandbox is provider-agnostic.
+   *
+   * @example
+   * ```ts
+   * const sandbox = new Sandbox({
+   *   llmCall: async (prompt) => {
+   *     const response = await openai.chat.completions.create({
+   *       model: 'gpt-4o-mini',
+   *       messages: [{ role: 'user', content: prompt }],
+   *       temperature: 0,
+   *     });
+   *     return response.choices[0].message.content ?? '';
+   *   },
+   * });
+   * ```
+   */
+  llmCall: SandboxCallFn;
+
+  /** Maximum number of retry attempts for malformed output. Default: 3 */
+  maxRetries?: number;
+
+  /** Timeout for the LLM call in milliseconds. Default: 10000 */
+  timeout?: number;
+
+  /**
+   * Behavior when extraction fails after all retries.
+   * - `"closed"` (default): Throws an error, blocking the pipeline.
+   * - `"open"`: Returns default values for all schema fields.
+   */
+  failMode?: "open" | "closed";
 }
 
 export type ExtractionSchema = Record<
@@ -443,6 +484,8 @@ export type ExtractionSchema = Record<
     type: "string" | "number" | "boolean" | "enum";
     values?: string[];
     maxLength?: number;
+    /** Default value used when failMode is "open" and extraction fails. */
+    default?: string | number | boolean;
   }
 >;
 

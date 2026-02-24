@@ -39,7 +39,14 @@ export {
 } from "./multimodal/index.js";
 
 // ─── Policy ──────────────────────────────────────────────────────────────────
-export { resolvePolicy, getPreset, isActionAllowed } from "./policy/index.js";
+export {
+  resolvePolicy,
+  getPreset,
+  isActionAllowed,
+  loadPolicyFile,
+  validatePolicySchema,
+  parseSimpleYaml,
+} from "./policy/index.js";
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 export { normalizeEncoding, tryDecodeBase64 } from "./scanner/encoding.js";
@@ -102,6 +109,7 @@ export type {
 
   // Sandbox
   SandboxConfig,
+  SandboxCallFn,
   ExtractionSchema,
 
   // Audit

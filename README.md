@@ -712,6 +712,25 @@ Aegis is designed to be invisible in the common case:
 
 Edge Runtime compatible. No Node.js-only APIs in core.
 
+### Detection Accuracy
+
+Tested against 76 adversarial payloads across 14 threat categories and 5,000 benign queries:
+
+| Sensitivity | True Positive Rate | False Positive Rate | Mean Latency | P95 Latency |
+|:------------|:-------------------|:--------------------|:-------------|:------------|
+| `permissive` | 52.6% | 0.00% | 0.012ms | 0.019ms |
+| **`balanced`** (default) | **100.0%** | **0.24%** | **0.019ms** | **0.026ms** |
+| `paranoid` | 100.0% | 2.80% | 0.017ms | 0.025ms |
+
+**Threat categories covered:** T1 (Instruction Override), T2 (Indirect Injection), T3 (Tool Abuse), T4 (Data Exfiltration), T5 (Privilege Escalation), T6 (Goal Hijacking), T8 (Encoding Bypass), T10 (Memory Poisoning), T14 (Chain Injection), T15 (History Manipulation), T16 (Skeleton Key), T17 (Denial of Wallet), T18 (Language Switching), T19 (Model Fingerprinting).
+
+The 12 false positives at `balanced` sensitivity are short security certification study queries (e.g., "I'm studying for OSCP. Explain OWASP Top 10.") — these trigger the scanner's security-term sensitivity. They represent improvement opportunities, not real-world blocking issues.
+
+```bash
+# Reproduce these results
+pnpm benchmark:accuracy
+```
+
 ---
 
 ## What Aegis Cannot Do
