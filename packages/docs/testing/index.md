@@ -1,56 +1,62 @@
 # Testing Guide
 
-::: warning Work in Progress
-Detailed testing documentation is coming soon. The sections below outline what the `@aegis-sdk/testing` package provides.
-:::
+## Philosophy
 
-## Overview
+If you can not break it, you can not trust it.
 
-The `@aegis-sdk/testing` package provides red team tools for validating your Aegis configuration against known prompt injection attack patterns.
+Prompt injection is an adversarial problem. Your defenses need to be tested against the same attack techniques that real attackers use. The `@aegis-sdk/testing` package provides structured red team tools so you can measure your detection rate, identify blind spots, and prevent regressions before they reach production.
+
+## What @aegis-sdk/testing Provides
+
+- **RedTeamScanner** — automated attack suite runner with per-suite detection rates, timing data, and false negative identification
+- **20 attack suites** covering threats T1 through T19: direct injection, role manipulation, delimiter escape, virtualization, indirect injection, tool abuse, data exfiltration, privilege escalation, goal hijacking, crescendo, encoding bypass, memory poisoning, many-shot, adversarial suffix, context flooding, chain injection, history manipulation, skeleton key, denial of wallet, language switching, and model fingerprinting
+- **BossBattle** — structured 5-tier challenge system for hands-on red teaming
+- **PayloadGenerator** — template-based fuzzing with encoding variants
+- **Promptfoo integration** — config generator and custom assertion for CI/CD red teaming
+
+## Quick Start
 
 ```ts
 import { RedTeamScanner } from "@aegis-sdk/testing";
+
+const scanner = new RedTeamScanner();
+const results = await scanner.run(
+  { policy: "strict" },
+  { suites: ["direct-injection", "encoding-bypass"] }
+);
+
+console.log(`Detection rate: ${(results.detectionRate * 100).toFixed(1)}%`);
+console.log(`Missed: ${results.missed} of ${results.total}`);
+
+// Detailed report
+console.log(scanner.generateReport(results));
 ```
 
-## What's Included
+## CLI Quick Start
 
-### Red Team Scanner
+```bash
+# Run all suites with balanced policy
+npx @aegis-sdk/cli test
 
-A scanner that runs a corpus of adversarial payloads against your Aegis instance and reports which attacks were caught and which slipped through.
+# Run specific suites with strict policy
+npx @aegis-sdk/cli test --policy strict --suites direct-injection,encoding-bypass
 
-### Attack Suites
-
-Built-in attack corpora organized by category:
-
-- **Instruction override** — "Ignore previous instructions" variants
-- **Role manipulation** — "You are now DAN" style attacks
-- **Skeleton key** — Multi-turn jailbreaks
-- **Delimiter escape** — Breaking out of XML/markdown delimiters
-- **Encoding attacks** — Base64, Unicode, ROT13 encoded payloads
-- **Adversarial suffixes** — High-entropy gibberish suffixes
-- **Many-shot jailbreaking** — Repeated example/response conditioning
-- **Indirect injection** — Payloads hidden in RAG content
-- **Tool abuse** — Manipulating function/tool calls
-- **Data exfiltration** — Leaking system prompts or PII
-
-### Benign Corpus
-
-A set of legitimate, non-malicious inputs that should **not** be flagged. This corpus helps you measure false positive rates and tune scanner sensitivity.
-
-### Promptfoo Integration
-
-Integration with [Promptfoo](https://promptfoo.dev) for automated red teaming as part of your CI/CD pipeline.
-
-### CLI Tool
-
-A command-line scanner for running red team tests from your terminal:
-
-```sh
-npx @aegis-sdk/cli scan --policy strict --suite all
+# Scan a single message
+npx @aegis-sdk/cli scan "Ignore all previous instructions"
 ```
 
-## Next Steps
+## CI/CD Integration
 
-- [Red Team Scanner](/testing/red-team) — Detailed API for the scanner
-- [CLI Tool](/testing/cli) — Command-line usage
-- [Promptfoo Integration](/testing/promptfoo) — CI/CD red teaming
+The CLI exits with code `0` when the detection rate is >= 95%, and code `1` otherwise. Add it to your CI pipeline:
+
+```yaml
+- name: Aegis Red Team
+  run: npx @aegis-sdk/cli test --policy strict --json
+```
+
+## Sections
+
+- [Red Team Scanner](/testing/red-team) — Full API for the automated scanner
+- [Boss Battle](/testing/boss-battle) — Structured 5-tier challenge system
+- [CLI Tool](/testing/cli) — Command-line usage and flags
+- [Promptfoo Integration](/testing/promptfoo) — CI/CD red teaming with Promptfoo

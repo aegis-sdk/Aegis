@@ -35,6 +35,11 @@ export default defineConfig({
             { text: "Quick Start", link: "/guide/quick-start" },
             { text: "Installation", link: "/guide/installation" },
             { text: "Configuration", link: "/guide/configuration" },
+            { text: "Troubleshooting", link: "/guide/troubleshooting" },
+            {
+              text: "Production Deployment",
+              link: "/guide/production",
+            },
           ],
         },
         {
@@ -83,6 +88,16 @@ export default defineConfig({
               text: "Trajectory Analysis",
               link: "/advanced/trajectory",
             },
+            {
+              text: "Perplexity Analysis",
+              link: "/advanced/perplexity",
+            },
+            { text: "LLM Judge", link: "/advanced/llm-judge" },
+            {
+              text: "Multi-Modal Scanning",
+              link: "/advanced/multimodal",
+            },
+            { text: "Auto-Retry", link: "/advanced/auto-retry" },
           ],
         },
       ],
@@ -116,6 +131,7 @@ export default defineConfig({
               text: "Promptfoo Integration",
               link: "/testing/promptfoo",
             },
+            { text: "Boss Battle", link: "/testing/boss-battle" },
           ],
         },
       ],
@@ -132,6 +148,16 @@ export default defineConfig({
               text: "Trajectory Analysis",
               link: "/advanced/trajectory",
             },
+            {
+              text: "Perplexity Analysis",
+              link: "/advanced/perplexity",
+            },
+            { text: "LLM Judge", link: "/advanced/llm-judge" },
+            {
+              text: "Multi-Modal Scanning",
+              link: "/advanced/multimodal",
+            },
+            { text: "Auto-Retry", link: "/advanced/auto-retry" },
           ],
         },
       ],

@@ -43,6 +43,15 @@ interface AegisConfig {
 
   /** HMAC message integrity for detecting history manipulation */
   integrity?: MessageIntegrityConfig;
+
+  /** Auto-retry with escalated security on blocked input (v0.4.0) */
+  autoRetry?: AutoRetryConfig;
+
+  /** Multi-modal content scanning — images, PDFs, audio, etc. (v0.4.0) */
+  multiModal?: MultiModalConfig;
+
+  /** LLM-Judge intent alignment verification (v0.4.0) */
+  judge?: LLMJudgeConfig;
 }
 ```
 
@@ -164,6 +173,15 @@ interface InputScannerConfig {
 
   /** Number of example/response pairs to trigger many-shot detection */
   manyShotThreshold?: number;
+
+  /** Enable character-level perplexity estimation (v0.4.0). Default: false */
+  perplexityEstimation?: boolean;
+
+  /** Perplexity anomaly threshold in bits per character. Default: 4.5 */
+  perplexityThreshold?: number;
+
+  /** Full perplexity analyzer configuration (overrides perplexityThreshold). */
+  perplexityConfig?: PerplexityConfig;
 }
 ```
 
@@ -172,6 +190,55 @@ interface InputScannerConfig {
 - **`paranoid`** — Lowest thresholds, most false positives. Use when security is paramount.
 - **`balanced`** — Default. Good trade-off between security and usability.
 - **`permissive`** — Highest thresholds, fewest false positives. Use for trusted environments.
+
+### Perplexity Estimation <Badge type="tip" text="v0.4.0" />
+
+Character-level n-gram perplexity analysis detects adversarial inputs that are statistically unusual — GCG adversarial suffixes, encoded payloads, random gibberish — without requiring ML models or bundled weights.
+
+Natural English text clusters around 3.0-4.0 bits/char. Adversarial suffixes from gradient-based attacks typically exceed 5.0 bits/char.
+
+```ts
+const aegis = new Aegis({
+  scanner: {
+    perplexityEstimation: true,
+    perplexityThreshold: 4.5, // Default — raise to reduce false positives on technical content
+  },
+});
+```
+
+For fine-grained control, use the full `perplexityConfig`:
+
+```ts
+const aegis = new Aegis({
+  scanner: {
+    perplexityEstimation: true,
+    perplexityConfig: {
+      enabled: true,
+      threshold: 4.5,    // Bits per character anomaly threshold
+      windowSize: 50,    // Characters per sliding window
+      ngramOrder: 3,     // Trigram analysis (character-level)
+      languageProfiles: {
+        english: {
+          name: "English",
+          expectedRange: { min: 2.5, max: 4.0 },
+          commonNgrams: ["the", "ing", "and", "ent", "ion"],
+        },
+      },
+    },
+  },
+});
+```
+
+The `ScanResult` includes a `perplexity` field when enabled:
+
+```ts
+const result = scanner.scan(quarantinedInput);
+if (result.perplexity?.anomalous) {
+  console.log("Perplexity:", result.perplexity.perplexity);
+  console.log("Max window:", result.perplexity.maxWindowPerplexity);
+  // result.perplexity.windowScores has per-window breakdown
+}
+```
 
 ## Recovery Modes
 
@@ -199,11 +266,24 @@ interface RecoveryConfig {
 | `reset-last` | Strip the offending message and return remaining history |
 | `quarantine-session` | Lock the session — all future input is blocked |
 | `terminate-session` | Throw a terminal error — session must be recreated |
+| `auto-retry` | Re-scan with escalated security; throw only if all retries fail (v0.4.0) |
 
 ```ts
 // Example: strip the bad message instead of throwing
 const aegis = new Aegis({
   recovery: { mode: "reset-last" },
+});
+```
+
+```ts
+// Example: auto-retry with escalated scanning before giving up
+const aegis = new Aegis({
+  recovery: { mode: "auto-retry" },
+  autoRetry: {
+    enabled: true,
+    maxAttempts: 3,
+    escalationPath: "stricter_scanner",
+  },
 });
 ```
 
@@ -278,6 +358,209 @@ const aegis = new Aegis({
   },
 });
 ```
+
+## Auto-Retry Configuration <Badge type="tip" text="v0.4.0" />
+
+When `recovery.mode` is set to `"auto-retry"`, the `autoRetry` config controls how Aegis re-scans blocked input with escalated security before giving up.
+
+```ts
+interface AutoRetryConfig {
+  /** Whether auto-retry is enabled. */
+  enabled: boolean;
+
+  /** Maximum number of retry attempts before giving up. Default: 3 */
+  maxAttempts?: number;
+
+  /** Escalation strategy to apply on retry. Default: "stricter_scanner" */
+  escalationPath?: AutoRetryEscalation;
+
+  /** Callback invoked before each retry attempt. */
+  onRetry?: (context: RetryContext) => void | Promise<void>;
+}
+```
+
+### Escalation Strategies
+
+| Strategy | Behavior |
+|----------|----------|
+| `stricter_scanner` | Re-scan the input with `sensitivity: "paranoid"` (default) |
+| `sandbox` | Flag the input for sandbox extraction — defers to the caller |
+| `combined` | Try paranoid scan first, then sandbox if still failing |
+
+```ts
+const aegis = new Aegis({
+  recovery: { mode: "auto-retry" },
+  autoRetry: {
+    enabled: true,
+    maxAttempts: 3,
+    escalationPath: "combined",
+    onRetry: (ctx) => {
+      console.log(
+        `Retry ${ctx.attempt}/${ctx.totalAttempts} — ` +
+        `escalation: ${ctx.escalation}, ` +
+        `original score: ${ctx.originalScore.toFixed(2)}`
+      );
+    },
+  },
+});
+```
+
+If all retry attempts fail, `guardInput()` throws `AegisInputBlocked` as usual. The audit log records each retry attempt with its result.
+
+## LLM Judge Configuration <Badge type="tip" text="v0.4.0" />
+
+The LLM Judge uses a secondary LLM call to verify whether model output aligns with the original user intent. This catches subtle manipulation that deterministic pattern matching cannot detect.
+
+```ts
+interface LLMJudgeConfig {
+  /** Whether the judge is active. Default: true */
+  enabled?: boolean;
+
+  /**
+   * Risk score threshold above which the judge is invoked (0-1).
+   * The judge only fires when the input scanner produces a score at or above
+   * this value. Default: 0.5
+   */
+  triggerThreshold?: number;
+
+  /** Timeout for the judge LLM call in milliseconds. Default: 5000 */
+  timeout?: number;
+
+  /** Custom system prompt for the judge. Overrides the built-in default. */
+  systemPrompt?: string;
+
+  /**
+   * The LLM call function — provided by you or a provider adapter.
+   * Takes a prompt string, returns the raw model response string.
+   * This is the only required field.
+   */
+  llmCall: (prompt: string) => Promise<string>;
+}
+```
+
+### Basic Setup
+
+```ts
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+
+const aegis = new Aegis({
+  judge: {
+    triggerThreshold: 0.5,
+    timeout: 5000,
+    llmCall: async (prompt) => {
+      const res = await openai.chat.completions.create({
+        model: "gpt-4o-mini", // Fast and cheap — the judge prompt is small
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0,
+      });
+      return res.choices[0].message.content ?? "";
+    },
+  },
+});
+```
+
+### Using the Judge
+
+The judge is invoked automatically during `guardInput()` when the scanner's risk score exceeds the `triggerThreshold`. You can also invoke it manually:
+
+```ts
+const verdict = await aegis.judgeOutput(
+  "What is the weather in Tokyo?",
+  modelResponseText,
+  {
+    riskScore: 0.6,
+    detections: scanResult.detections,
+  },
+);
+
+if (!verdict.approved) {
+  console.log("Judge rejected:", verdict.reasoning);
+  console.log("Decision:", verdict.decision); // "rejected" | "flagged"
+  console.log("Confidence:", verdict.confidence);
+}
+```
+
+### Cost/Latency Tips
+
+- Set `triggerThreshold` to 0.7+ so the judge only fires on already-suspicious inputs
+- Use `gpt-4o-mini`, `claude-haiku`, or another fast model — the judge prompt is small
+- Set `timeout` to 3000ms to cap worst-case latency
+- The judge falls back to `"flagged"` on timeout or error — it never silently approves on failure
+
+## Multi-Modal Scanning Configuration <Badge type="tip" text="v0.4.0" />
+
+The multi-modal scanner extracts text from images, PDFs, audio, and documents, then runs the full input scanner pipeline on the extracted content.
+
+```ts
+interface MultiModalConfig {
+  /** Whether multi-modal scanning is enabled. Default: true */
+  enabled?: boolean;
+
+  /** Maximum file size in bytes. Default: 10,485,760 (10 MB) */
+  maxFileSize?: number;
+
+  /** Allowed media types. Default: all types. */
+  allowedMediaTypes?: MediaType[];
+
+  /**
+   * The text extraction function — provided by you or an adapter.
+   * This is the only required field.
+   */
+  extractText: (
+    content: Uint8Array | string,
+    mediaType: MediaType,
+  ) => Promise<{ text: string; confidence: number }>;
+
+  /** Scanner sensitivity for extracted text. Inherits from main scanner if omitted. */
+  scannerSensitivity?: Sensitivity;
+}
+```
+
+Supported media types: `"image"`, `"audio"`, `"video"`, `"pdf"`, `"document"`.
+
+### Basic Setup
+
+Aegis does not bundle OCR or speech-to-text — you provide the extraction function. This keeps the core library dependency-free and lets you use any extraction service.
+
+```ts
+import Tesseract from "tesseract.js";
+
+const aegis = new Aegis({
+  multiModal: {
+    maxFileSize: 5 * 1024 * 1024, // 5 MB limit
+    allowedMediaTypes: ["image", "pdf"],
+    extractText: async (content, mediaType) => {
+      if (mediaType === "image") {
+        const result = await Tesseract.recognize(
+          content instanceof Uint8Array ? Buffer.from(content) : content,
+          "eng",
+        );
+        return { text: result.data.text, confidence: result.data.confidence / 100 };
+      }
+      // Handle other types...
+      return { text: "", confidence: 0 };
+    },
+  },
+});
+```
+
+### Scanning Media
+
+```ts
+const imageBytes = await fs.readFile("uploaded-image.png");
+
+const result = await aegis.scanMedia(imageBytes, "image");
+
+if (!result.safe) {
+  console.log("Injection detected in image!");
+  console.log("Extracted text:", result.extracted.text);
+  console.log("Scan detections:", result.scanResult.detections);
+}
+```
+
+The `MultiModalScanResult` includes the extracted text, extraction confidence, the full `ScanResult`, and the file size.
 
 ## Environment Variables
 

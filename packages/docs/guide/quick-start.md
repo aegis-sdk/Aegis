@@ -2,6 +2,10 @@
 
 Get Aegis protecting your AI application in under 5 minutes.
 
+::: tip What's New in v0.4.0
+v0.4.0 adds **LLM Judge** (semantic intent verification), **Multi-Modal Scanning** (images, PDFs, audio), **Perplexity Analysis** (adversarial suffix detection), and **Auto-Retry** (graceful retry with escalated security). All features are opt-in and backwards-compatible. See [Configuration](/guide/configuration) for the new options.
+:::
+
 ## 1. Install
 
 ::: code-group
@@ -124,3 +128,5 @@ export async function POST(req: Request) {
 - [Installation](/guide/installation) — All package managers and framework adapters
 - [Configuration](/guide/configuration) — Policy presets, scanner sensitivity, recovery modes
 - [Vercel AI SDK Guide](/guide/vercel-ai) — Deep dive into Vercel integration
+- [Troubleshooting](/guide/troubleshooting) — False positive tuning and common integration issues
+- [Production Deployment](/guide/production) — Security checklist, monitoring, and alerting
