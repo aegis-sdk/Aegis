@@ -24,6 +24,7 @@
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build && changeset publish",
+    "benchmark": "vitest bench",
     "sync-patterns": "tsx scripts/sync-patterns.ts"
   },
   "pnpm": {

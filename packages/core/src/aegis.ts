@@ -5,6 +5,8 @@ import type {
   ChainStepOptions,
   ChainStepResult,
   GuardInputOptions,
+  MediaType,
+  MultiModalScanResult,
   PromptMessage,
   RecoveryConfig,
   ScanResult,
@@ -16,6 +18,10 @@ import { AuditLog } from "./audit/index.js";
 import { resolvePolicy } from "./policy/index.js";
 import { ActionValidator } from "./validator/index.js";
 import { MessageSigner } from "./integrity/index.js";
+import { AutoRetryHandler } from "./retry/index.js";
+import { LLMJudge } from "./judge/index.js";
+import type { JudgeVerdict, JudgeEvaluationContext } from "./judge/index.js";
+import { MultiModalScanner } from "./multimodal/index.js";
 
 /**
  * Aegis — the main entry point for streaming-first prompt injection defense.
@@ -48,6 +54,9 @@ export class Aegis {
   private recovery: RecoveryConfig;
   private agentLoopConfig: AgentLoopConfig;
   private messageSigner: MessageSigner | null;
+  private retryHandler: AutoRetryHandler | null;
+  private judge: LLMJudge | null;
+  private multiModal: MultiModalScanner | null;
   private sessionQuarantined = false;
 
   /** Default privilege decay schedule */
@@ -73,11 +82,25 @@ export class Aegis {
     this.recovery = config.recovery ?? { mode: "continue" };
     this.agentLoopConfig = config.agentLoop ?? {};
     this.messageSigner = config.integrity ? new MessageSigner(config.integrity) : null;
+    this.retryHandler = config.autoRetry?.enabled ? new AutoRetryHandler(config.autoRetry) : null;
+    this.judge =
+      config.judge?.llmCall && config.judge?.enabled !== false ? new LLMJudge(config.judge) : null;
+    this.multiModal =
+      config.multiModal?.extractText && config.multiModal?.enabled !== false
+        ? new MultiModalScanner(config.multiModal)
+        : null;
 
     // Wire the validator's audit callback to our AuditLog
     this.validator.setAuditCallback((entry) => {
       this.audit.log(entry);
     });
+
+    // Wire the multi-modal scanner's audit callback to our AuditLog
+    if (this.multiModal) {
+      this.multiModal.setAuditCallback((entry) => {
+        this.audit.log(entry);
+      });
+    }
   }
 
   /**
@@ -155,12 +178,13 @@ export class Aegis {
    * - `reset-last`: Strip the offending message and return the remaining history
    * - `quarantine-session`: Lock the session — all future input is blocked
    * - `terminate-session`: Throw a terminal error (session must be recreated)
+   * - `auto-retry`: Re-scan with escalated security; throw if exhausted
    */
-  private handleRecovery(
+  private async handleRecovery(
     messages: PromptMessage[],
     offending: PromptMessage,
     result: ScanResult,
-  ): never | PromptMessage[] {
+  ): Promise<never | PromptMessage[]> {
     switch (this.recovery.mode) {
       case "reset-last": {
         this.audit.log({
@@ -189,6 +213,48 @@ export class Aegis {
           context: { recovery: "terminate-session", score: result.score },
         });
         throw new AegisSessionTerminated(result);
+      }
+
+      case "auto-retry": {
+        if (!this.retryHandler) {
+          throw new AegisInputBlocked(result);
+        }
+
+        const quarantined = quarantine(offending.content, { source: "user_input" });
+
+        for (let attempt = 1; attempt <= this.retryHandler.getMaxAttempts(); attempt++) {
+          const retryResult = await this.retryHandler.attemptRetry(
+            quarantined,
+            result.detections,
+            attempt,
+            this.scanner,
+          );
+
+          this.audit.log({
+            event: "scan_block",
+            decision: retryResult.succeeded ? "allowed" : "blocked",
+            context: {
+              recovery: "auto-retry",
+              attempt,
+              maxAttempts: this.retryHandler.getMaxAttempts(),
+              escalation: retryResult.escalation,
+              succeeded: retryResult.succeeded,
+              exhausted: retryResult.exhausted,
+              score: retryResult.scanResult?.score,
+            },
+          });
+
+          if (retryResult.succeeded) {
+            return messages;
+          }
+
+          if (retryResult.exhausted) {
+            break;
+          }
+        }
+
+        // All attempts exhausted — block the input
+        throw new AegisInputBlocked(result);
       }
 
       case "continue":
@@ -247,6 +313,151 @@ export class Aegis {
    */
   getMessageSigner(): MessageSigner | null {
     return this.messageSigner;
+  }
+
+  /**
+   * Get the auto-retry handler for retry-with-escalation operations.
+   *
+   * Returns null if no autoRetry configuration was provided or if
+   * autoRetry is not enabled.
+   *
+   * @returns The AutoRetryHandler instance, or null if auto-retry is not configured
+   */
+  getRetryHandler(): AutoRetryHandler | null {
+    return this.retryHandler;
+  }
+
+  /**
+   * Get the LLM-Judge instance for intent alignment verification.
+   *
+   * Returns null if no judge configuration was provided or if the
+   * judge is disabled. The judge verifies whether model output
+   * aligns with the original user intent — catching subtle manipulation
+   * that deterministic pattern-matching cannot detect.
+   *
+   * @returns The LLMJudge instance, or null if judge is not configured
+   */
+  getJudge(): LLMJudge | null {
+    return this.judge;
+  }
+
+  /**
+   * Get the multi-modal scanner for media content scanning.
+   *
+   * Returns null if no multiModal configuration was provided or if the
+   * extractText function is missing. The scanner extracts text from
+   * images, PDFs, audio, and other media, then scans the extracted text
+   * for injection attempts.
+   *
+   * @returns The MultiModalScanner instance, or null if not configured
+   */
+  getMultiModalScanner(): MultiModalScanner | null {
+    return this.multiModal;
+  }
+
+  /**
+   * Scan media content for prompt injection attempts.
+   *
+   * Convenience method that delegates to the MultiModalScanner.
+   * Extracts text from the provided media content using the configured
+   * extractText function, then scans the extracted text for injection patterns.
+   *
+   * Throws if the multi-modal scanner is not configured. Use
+   * `getMultiModalScanner()` to check availability before calling.
+   *
+   * @param content - Raw media content as `Uint8Array` or base64-encoded string
+   * @param mediaType - The type of media being scanned
+   * @returns Scan result with extraction data and safety verdict
+   * @throws {Error} if multi-modal scanning is not configured
+   *
+   * @example
+   * ```ts
+   * const aegis = new Aegis({
+   *   multiModal: {
+   *     extractText: async (content, type) => {
+   *       const text = await myOcrService.extract(content);
+   *       return { text, confidence: 0.95 };
+   *     },
+   *   },
+   * });
+   *
+   * const result = await aegis.scanMedia(imageBytes, 'image');
+   * if (!result.safe) {
+   *   console.warn('Injection detected in media');
+   * }
+   * ```
+   */
+  async scanMedia(
+    content: Uint8Array | string,
+    mediaType: MediaType,
+  ): Promise<MultiModalScanResult> {
+    if (!this.multiModal) {
+      throw new Error(
+        "[aegis] Multi-modal scanner is not configured. Provide a `multiModal` config with an `extractText` function.",
+      );
+    }
+
+    return this.multiModal.scanMedia(content, mediaType);
+  }
+
+  /**
+   * Evaluate model output against original user intent using the LLM-Judge.
+   *
+   * This is a convenience method that invokes the judge and logs the
+   * evaluation result to the audit log. Returns the structured verdict.
+   *
+   * Throws if the judge is not configured. Use `getJudge()` to check
+   * availability before calling this method.
+   *
+   * @param userRequest - The original user input / request
+   * @param modelOutput - The model's generated output to evaluate
+   * @param context - Optional additional context (messages, detections, risk score)
+   * @returns A structured verdict with approval status, confidence, and reasoning
+   * @throws {Error} if the judge is not configured
+   *
+   * @example
+   * ```ts
+   * const verdict = await aegis.judgeOutput(
+   *   "What is the weather in Tokyo?",
+   *   modelResponse,
+   *   { riskScore: scanResult.score, detections: scanResult.detections }
+   * );
+   * if (!verdict.approved) {
+   *   // Block or flag the output
+   * }
+   * ```
+   */
+  async judgeOutput(
+    userRequest: string,
+    modelOutput: string,
+    context?: JudgeEvaluationContext,
+  ): Promise<JudgeVerdict> {
+    if (!this.judge) {
+      throw new Error(
+        "[aegis] LLM-Judge is not configured. Provide a `judge` config with an `llmCall` function.",
+      );
+    }
+
+    const verdict = await this.judge.evaluate(userRequest, modelOutput, context);
+
+    this.audit.log({
+      event: "judge_evaluation",
+      decision:
+        verdict.decision === "approved"
+          ? "allowed"
+          : verdict.decision === "rejected"
+            ? "blocked"
+            : "flagged",
+      context: {
+        decision: verdict.decision,
+        confidence: verdict.confidence,
+        reasoning: verdict.reasoning,
+        executionTimeMs: verdict.executionTimeMs,
+        approved: verdict.approved,
+      },
+    });
+
+    return verdict;
   }
 
   /**

@@ -22,6 +22,21 @@ export { Sandbox } from "./sandbox/index.js";
 export { MessageSigner } from "./integrity/index.js";
 export { AlertingEngine } from "./alerting/index.js";
 export { TrajectoryAnalyzer } from "./scanner/trajectory.js";
+export { PerplexityAnalyzer } from "./scanner/perplexity.js";
+export { AutoRetryHandler } from "./retry/index.js";
+export { LLMJudge } from "./judge/index.js";
+export type {
+  LLMJudgeConfig,
+  LLMJudgeCallFn,
+  JudgeVerdict,
+  JudgeEvaluationContext,
+} from "./judge/index.js";
+export {
+  MultiModalScanner,
+  MultiModalFileTooLarge,
+  MultiModalUnsupportedType,
+  MultiModalExtractionFailed,
+} from "./multimodal/index.js";
 
 // ─── Policy ──────────────────────────────────────────────────────────────────
 export { resolvePolicy, getPreset, isActionAllowed } from "./policy/index.js";
@@ -52,6 +67,12 @@ export type {
   EntropyResult,
   Sensitivity,
   ScanStrategy,
+
+  // Perplexity
+  PerplexityResult,
+  PerplexityWindowScore,
+  PerplexityLanguageProfile,
+  PerplexityConfig,
 
   // Prompt Builder
   PromptBuilderConfig,
@@ -103,6 +124,19 @@ export type {
 
   // Trajectory
   TopicDriftResult,
+
+  // Auto-Retry
+  AutoRetryConfig,
+  AutoRetryEscalation,
+  RetryContext,
+  RetryResult,
+
+  // Multi-Modal
+  MediaType,
+  TextExtractorFn,
+  ExtractedContent,
+  MultiModalConfig,
+  MultiModalScanResult,
 
   // Top-level
   AegisConfig,

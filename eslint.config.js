@@ -19,6 +19,12 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "**/*.config.*"],
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/*.config.*",
+      "packages/dashboard/bin/**",
+      "packages/dashboard/scripts/**",
+    ],
   },
 );

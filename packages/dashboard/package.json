@@ -1,0 +1,35 @@
+{
+  "name": "@aegis-sdk/dashboard",
+  "version": "0.4.0",
+  "description": "Audit log visualization dashboard for Aegis prompt injection defense",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "aegis-dashboard": "./bin/serve.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "node bin/serve.js"
+  },
+  "keywords": [
+    "aegis",
+    "dashboard",
+    "audit",
+    "visualization",
+    "llm",
+    "security"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aegis-sdk/Aegis.git",
+    "directory": "packages/dashboard"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "sideEffects": false
+}

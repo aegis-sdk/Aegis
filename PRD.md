@@ -5,7 +5,7 @@
 **Version:** 3.1 (Post-Phase 3 Audit)
 **Author:** Josh + Claude
 **Date:** February 18, 2026
-**Status:** v0.3.0 Shipped / Phase 3 Complete — Ready for Phase 4
+**Status:** v0.4.0 Shipped / Phase 4 Complete — Ready for Long-Term Roadmap
 **Package Scope:** `@aegis-sdk/core`
 
 ---
@@ -2452,20 +2452,23 @@ aegis/
 - [x] Test coverage above 80/75/80/80 thresholds (96.85% statements, 92.41% branches, 98.64% functions, 97.44% lines)
 - [x] CI fully green (lint, typecheck, tests, coverage, adversarial suite across Node 18/20/22)
 
-### Phase 4: Advanced (Weeks 18-23) — v0.4.0
+### Phase 4: Advanced (Weeks 18-23) — v0.4.0 — COMPLETE
 
-- [ ] LLM-judge intent alignment (optional)
-- [ ] Perplexity-based input analysis (optional lightweight model)
-- [ ] Multi-modal content scanning (images with text)
-- [ ] Advanced conversation history analysis (multi-turn attack detection with ML)
-- [ ] Dashboard UI for audit log visualization
-- [ ] OWASP LLM Top 10 compliance mapping document
-- [ ] MITRE ATLAS + NIST AI RMF compliance guide
-- [ ] EU AI Act alignment guide
-- [ ] Anonymous threat intelligence telemetry (opt-in)
-- [ ] Auto-retry with elevated security after kill switch
-- [ ] Performance optimization pass
-- [ ] **Boss Battle Alpha** — Tiers 1-5, invite-only
+- [x] LLM-judge intent alignment (optional) — `LLMJudge` class, provider-agnostic via `llmCall` function
+- [x] Perplexity-based input analysis — character-level n-gram perplexity estimator, zero dependencies, integrated into InputScanner
+- [x] Multi-modal content scanning (images with text) — `MultiModalScanner` class, provider-agnostic via `extractText` function
+- [ ] Advanced conversation history analysis (multi-turn attack detection with ML) — _deferred; keyword-based trajectory analysis sufficient for now_
+- [x] Dashboard UI for audit log visualization — `@aegis-sdk/dashboard` standalone HTML dashboard with JSONL reader
+- [x] OWASP LLM Top 10 compliance mapping document — `docs/compliance/owasp-llm-top10.md`
+- [x] MITRE ATLAS + NIST AI RMF compliance guide — `docs/compliance/mitre-atlas-nist.md`
+- [x] EU AI Act alignment guide — `docs/compliance/eu-ai-act.md`
+- [ ] Anonymous threat intelligence telemetry (opt-in) — _deferred to Long-Term; trust model still open_
+- [x] Auto-retry with elevated security after kill switch — `AutoRetryHandler` with escalation strategies
+- [x] Performance optimization pass — full benchmark suite in `benchmarks/`, all PRD targets met by 100-1000x margins
+- [x] **Boss Battle Alpha** — Tiers 1-5, 15 challenges with progressive difficulty in `@aegis-sdk/testing`
+- [x] Koa adapter (`@aegis-sdk/koa`) — _added beyond original scope_
+- [x] CLI fixes — bin entry, dynamic version, keywords
+- [x] Benign corpus expanded from 3,181 to 5,000 queries (3 new categories: edge_case_queries, conversational, math_science)
 
 ### Long-Term
 

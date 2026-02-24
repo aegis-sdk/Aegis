@@ -23,19 +23,21 @@ aegis/
 │   ├── next/          # Next.js integration
 │   ├── hono/          # Hono middleware
 │   ├── sveltekit/     # SvelteKit integration
-│   ├── cli/           # CLI tool (scaffold)
+│   ├── koa/           # Koa middleware
+│   ├── cli/           # CLI tool
+│   ├── dashboard/     # Audit log visualization dashboard
 │   └── docs/          # VitePress documentation site
 ├── tests/
-│   ├── unit/          # Unit tests (26 files, 3619 tests)
+│   ├── unit/          # Unit tests (31 files, 5653 tests)
 │   ├── adversarial/   # Known attack pattern tests
-│   ├── benign/        # False positive prevention tests (3,184 queries)
+│   ├── benign/        # False positive prevention tests (5,000 queries)
 │   ├── fuzz/          # Template-based fuzzing (fast-check)
 │   └── integration/   # End-to-end tests
 ├── scripts/           # Pattern sync, corpus generation
-├── docs/              # Standalone documentation (getting-started, MCP guide)
+├── docs/              # Standalone documentation (getting-started, MCP guide, compliance)
 ├── examples/          # Working example projects
-├── benchmarks/        # Performance benchmarks
-└── PRD.md             # Product Requirements Document (v3.1)
+├── benchmarks/        # Performance benchmarks (Vitest bench)
+└── PRD.md             # Product Requirements Document (v3.2)
 ```
 
 ## Key Commands
@@ -71,6 +73,10 @@ pnpm typecheck        # TypeScript type checking
 | **OTelTransport** | OpenTelemetry spans/metrics/logs transport | `src/audit/otel.ts` |
 | **AlertingEngine** | Real-time alerting (rate-spike, session-kills, etc.) | `src/alerting/index.ts` |
 | **MessageSigner** | HMAC conversation integrity (T15) | `src/integrity/index.ts` |
+| **PerplexityAnalyzer** | Character n-gram perplexity for adversarial suffix detection | `src/scanner/perplexity.ts` |
+| **LLMJudge** | Provider-agnostic LLM-based intent alignment verification | `src/judge/index.ts` |
+| **MultiModalScanner** | Extract + scan text from images/audio/documents | `src/multimodal/index.ts` |
+| **AutoRetryHandler** | Retry with escalated security after kill switch | `src/retry/index.ts` |
 
 ### Defense Pipeline
 
@@ -97,12 +103,12 @@ User Input → Quarantine → Input Scanner → [Adaptive Sandbox] → Prompt Bu
 
 - Test framework: **Vitest 4** (globals mode)
 - Tests live in `tests/` directory (not co-located with source)
-- 26 test files, 3,619 tests passing
+- 31 test files, 5,653 tests passing
 - Adversarial tests in `tests/adversarial/` verify detection of known attacks
-- Benign corpus in `tests/benign/` prevents false positives (3,184 queries)
+- Benign corpus in `tests/benign/` prevents false positives (5,000 queries)
 - Template-based fuzzing with `fast-check` in `tests/fuzz/`
 - Coverage thresholds: 80% statements, 75% branches, 80% functions, 80% lines
-- Current coverage: 96.85% / 92.41% / 98.64% / 97.44%
+- Performance benchmarks in `benchmarks/core.bench.ts` (run with `pnpm benchmark`)
 - CI runs tests across Node 18, 20, and 22
 
 ## Package Scope

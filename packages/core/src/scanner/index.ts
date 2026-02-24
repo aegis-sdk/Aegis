@@ -5,14 +5,20 @@ import type {
   InputScannerConfig,
   TrajectoryResult,
   PromptMessage,
+  PerplexityResult,
 } from "../types.js";
 import { INJECTION_PATTERNS } from "./patterns.js";
 import { normalizeEncoding } from "./encoding.js";
 import { analyzeEntropy } from "./entropy.js";
 import { detectLanguageSwitches } from "./language.js";
 import { TrajectoryAnalyzer } from "./trajectory.js";
+import { PerplexityAnalyzer } from "./perplexity.js";
 
-const DEFAULT_CONFIG: Required<InputScannerConfig> = {
+type ResolvedScannerConfig = Required<Omit<InputScannerConfig, "perplexityConfig">> & {
+  perplexityConfig?: InputScannerConfig["perplexityConfig"];
+};
+
+const DEFAULT_CONFIG: ResolvedScannerConfig = {
   sensitivity: "balanced",
   customPatterns: [],
   encodingNormalization: true,
@@ -23,6 +29,7 @@ const DEFAULT_CONFIG: Required<InputScannerConfig> = {
   mlClassifier: false,
   entropyThreshold: 4.5,
   manyShotThreshold: 5,
+  perplexityThreshold: 4.5,
 };
 
 /**
@@ -33,10 +40,20 @@ const DEFAULT_CONFIG: Required<InputScannerConfig> = {
  * ML-based semantic analysis.
  */
 export class InputScanner {
-  private config: Required<InputScannerConfig>;
+  private config: ResolvedScannerConfig;
+  private perplexityAnalyzer: PerplexityAnalyzer | null = null;
 
   constructor(config: InputScannerConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Initialize the PerplexityAnalyzer if enabled
+    if (this.config.perplexityEstimation) {
+      const perplexityOpts = this.config.perplexityConfig ?? {};
+      this.perplexityAnalyzer = new PerplexityAnalyzer({
+        ...perplexityOpts,
+        threshold: perplexityOpts.threshold ?? this.config.perplexityThreshold,
+      });
+    }
   }
 
   /**
@@ -87,12 +104,28 @@ export class InputScanner {
       });
     }
 
-    // Step 5: Many-shot detection
+    // Step 5: Perplexity estimation (character-level n-gram analysis)
+    let perplexity: PerplexityResult | undefined;
+    if (this.perplexityAnalyzer) {
+      perplexity = this.perplexityAnalyzer.analyze(normalized);
+      if (perplexity.anomalous) {
+        detections.push({
+          type: "perplexity_anomaly",
+          pattern: "perplexity_threshold_exceeded",
+          matched: `maxWindow=${perplexity.maxWindowPerplexity.toFixed(2)}`,
+          severity: "high",
+          position: { start: 0, end: normalized.length },
+          description: `High perplexity detected (${perplexity.maxWindowPerplexity.toFixed(2)} bits/char), possible adversarial suffix or gibberish`,
+        });
+      }
+    }
+
+    // Step 6: Many-shot detection
     if (this.config.manyShotDetection) {
       this.detectManyShot(normalized, detections);
     }
 
-    // Step 6: Context flooding
+    // Step 7: Context flooding
     if (normalized.length > 10000) {
       detections.push({
         type: "context_flooding",
@@ -104,7 +137,7 @@ export class InputScanner {
       });
     }
 
-    // Step 7: Language/script detection
+    // Step 8: Language/script detection
     // IMPORTANT: Run language detection on the RAW text (before normalization).
     // Homoglyph normalization converts Cyrillic а→a, о→o, etc., which creates
     // artificial script switches within what were originally pure-Cyrillic words.
@@ -146,6 +179,7 @@ export class InputScanner {
       normalized,
       language,
       entropy,
+      ...(perplexity ? { perplexity } : {}),
     };
   }
 

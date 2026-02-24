@@ -43,3 +43,11 @@ export {
   type PromptfooAssertion,
   type GeneratePromptfooConfigOptions,
 } from "./promptfoo.js";
+export { BossBattle } from "./boss-battle.js";
+export type {
+  BossBattleConfig,
+  BossBattleTier,
+  BossBattleChallenge,
+  BossBattleResult,
+  BossBattleReport,
+} from "./boss-battle.js";

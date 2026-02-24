@@ -47,7 +47,12 @@ function color(text: string, ...codes: string[]): string {
 
 // ─── Version ────────────────────────────────────────────────────────────────
 
-const VERSION = "0.2.0";
+// Read version from package.json at runtime so it stays in sync automatically.
+// Using fs (already imported) + import.meta.url to resolve the path in ESM.
+const __pkgJson = JSON.parse(
+  fs.readFileSync(new URL("../package.json", import.meta.url), "utf-8"),
+) as { version: string };
+const VERSION: string = __pkgJson.version;
 
 // ─── Available Policy Presets ───────────────────────────────────────────────
 

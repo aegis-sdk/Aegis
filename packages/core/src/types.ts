@@ -4,6 +4,8 @@
  * These types form the foundation of the defense pipeline.
  */
 
+import type { JudgeVerdict, LLMJudgeConfig } from "./judge/index.js";
+
 // ─── Content Sources ─────────────────────────────────────────────────────────
 
 export type ContentSource =
@@ -25,7 +27,12 @@ export type Sensitivity = "paranoid" | "balanced" | "permissive";
 
 export type ScanStrategy = "last-user" | "all-user" | "full-history";
 
-export type RecoveryMode = "continue" | "reset-last" | "quarantine-session" | "terminate-session";
+export type RecoveryMode =
+  | "continue"
+  | "reset-last"
+  | "quarantine-session"
+  | "terminate-session"
+  | "auto-retry";
 
 export type DelimiterStrategy = "xml" | "markdown" | "json" | "triple-hash";
 
@@ -72,6 +79,10 @@ export interface ScanResult {
   normalized: string;
   language: LanguageResult;
   entropy: EntropyResult;
+  /** Character-level perplexity analysis result (present when perplexityEstimation is enabled). */
+  perplexity?: PerplexityResult;
+  /** LLM-Judge verdict (present when the judge was invoked on this scan). */
+  judgeVerdict?: JudgeVerdict;
 }
 
 export interface Detection {
@@ -90,6 +101,7 @@ export type DetectionType =
   | "delimiter_escape"
   | "encoding_attack"
   | "adversarial_suffix"
+  | "perplexity_anomaly"
   | "many_shot"
   | "multi_language"
   | "virtualization"
@@ -105,6 +117,11 @@ export type DetectionType =
   | "denial_of_wallet"
   | "language_switching"
   | "model_fingerprinting"
+  | "image_injection"
+  | "audio_injection"
+  | "document_injection"
+  | "llm_judge_rejected"
+  | "intent_misalignment"
   | "custom";
 
 export interface LanguageResult {
@@ -122,6 +139,50 @@ export interface EntropyResult {
   mean: number;
   maxWindow: number;
   anomalous: boolean;
+}
+
+export interface PerplexityResult {
+  /** Overall estimated perplexity in bits per character. */
+  perplexity: number;
+  /** Whether the input exceeds the anomaly threshold. */
+  anomalous: boolean;
+  /** Per-window perplexity breakdown. */
+  windowScores: PerplexityWindowScore[];
+  /** The highest perplexity among all windows (the primary anomaly signal). */
+  maxWindowPerplexity: number;
+}
+
+export interface PerplexityWindowScore {
+  /** Start index of the window in the input string. */
+  start: number;
+  /** End index of the window in the input string. */
+  end: number;
+  /** Estimated perplexity (bits per character) for this window. */
+  perplexity: number;
+  /** The text content of this window. */
+  text: string;
+}
+
+export interface PerplexityLanguageProfile {
+  /** Display name of the language. */
+  name: string;
+  /** Expected perplexity range for well-formed text in this language. */
+  expectedRange: { min: number; max: number };
+  /** Most common character n-grams (lowercased), used to boost detection. */
+  commonNgrams: string[];
+}
+
+export interface PerplexityConfig {
+  /** Whether perplexity estimation is active. Default: true */
+  enabled?: boolean;
+  /** Anomaly threshold in bits per character. Default: 4.5 */
+  threshold?: number;
+  /** Sliding window size in characters for local analysis. Default: 50 */
+  windowSize?: number;
+  /** Character n-gram order (e.g. 3 = trigrams). Default: 3 */
+  ngramOrder?: number;
+  /** Named language profiles with expected perplexity ranges and common n-grams. */
+  languageProfiles?: Record<string, PerplexityLanguageProfile>;
 }
 
 export interface TrajectoryResult {
@@ -154,6 +215,10 @@ export interface InputScannerConfig {
   mlClassifier?: boolean;
   entropyThreshold?: number;
   manyShotThreshold?: number;
+  /** Perplexity anomaly threshold in bits per character. Default: 4.5 */
+  perplexityThreshold?: number;
+  /** Full perplexity analyzer configuration (overrides perplexityThreshold if both set). */
+  perplexityConfig?: PerplexityConfig;
 }
 
 // ─── Prompt Builder ──────────────────────────────────────────────────────────
@@ -402,6 +467,7 @@ export type AuditEventType =
   | "chain_step_scan"
   | "denial_of_wallet"
   | "policy_violation"
+  | "judge_evaluation"
   | "custom_check";
 
 export interface AuditEntry {
@@ -514,6 +580,107 @@ export interface MessageIntegrityConfig {
   assistantOnly?: boolean;
 }
 
+// ─── Auto-Retry ─────────────────────────────────────────────────────────────
+
+export type AutoRetryEscalation = "stricter_scanner" | "sandbox" | "combined";
+
+export interface AutoRetryConfig {
+  /** Whether auto-retry is enabled. */
+  enabled: boolean;
+  /** Maximum number of retry attempts before giving up. Default: 3 */
+  maxAttempts?: number;
+  /** The escalation strategy to apply on retry. Default: "stricter_scanner" */
+  escalationPath?: AutoRetryEscalation;
+  /** Callback invoked before each retry attempt. */
+  onRetry?: (context: RetryContext) => void | Promise<void>;
+}
+
+export interface RetryContext {
+  /** The current retry attempt number (1-based). */
+  attempt: number;
+  /** Total retry attempts configured. */
+  totalAttempts: number;
+  /** The escalation strategy applied for this attempt. */
+  escalation: AutoRetryEscalation;
+  /** Detections from the original failed scan. */
+  originalDetections: Detection[];
+  /** Composite score from the original failed scan. */
+  originalScore: number;
+}
+
+export interface RetryResult {
+  /** The attempt number this result corresponds to. */
+  attempt: number;
+  /** Whether this retry attempt succeeded (input passed elevated scan). */
+  succeeded: boolean;
+  /** The escalation strategy that was applied. */
+  escalation: AutoRetryEscalation;
+  /** The scan result from the retry attempt (if a re-scan was performed). */
+  scanResult?: ScanResult;
+  /** Whether all retry attempts have been exhausted without success. */
+  exhausted: boolean;
+}
+
+// ─── Multi-Modal ─────────────────────────────────────────────────────────────
+
+/** Supported media types for multi-modal content scanning. */
+export type MediaType = "image" | "audio" | "video" | "pdf" | "document";
+
+/**
+ * Text extractor function supplied by the user or adapter.
+ *
+ * Takes raw content (as `Uint8Array` or base64-encoded string) and the media
+ * type, and returns the extracted text with an extraction confidence score.
+ */
+export type TextExtractorFn = (
+  content: Uint8Array | string,
+  mediaType: MediaType,
+) => Promise<ExtractedContent>;
+
+/** Result of text extraction from media content. */
+export interface ExtractedContent {
+  /** The extracted text. */
+  text: string;
+  /** OCR/extraction confidence in the range [0, 1]. */
+  confidence: number;
+  /** Additional metadata from the extraction process. */
+  metadata?: Record<string, unknown>;
+}
+
+/** Configuration for the multi-modal content scanner. */
+export interface MultiModalConfig {
+  /** Whether multi-modal scanning is enabled. Default: `true` */
+  enabled?: boolean;
+  /** Maximum file size in bytes. Default: 10 485 760 (10 MB) */
+  maxFileSize?: number;
+  /** Allowed media types. Default: all types. */
+  allowedMediaTypes?: MediaType[];
+  /**
+   * The text extraction function — provided by the user or an adapter.
+   * This is the only required field.
+   */
+  extractText: TextExtractorFn;
+  /**
+   * Scanner sensitivity for extracted text.
+   * When omitted, inherits the sensitivity from the main scanner configuration.
+   */
+  scannerSensitivity?: Sensitivity;
+}
+
+/** Result of scanning media content for prompt injection. */
+export interface MultiModalScanResult {
+  /** The extracted content from the media. */
+  extracted: ExtractedContent;
+  /** Media type that was scanned. */
+  mediaType: MediaType;
+  /** Scan result from InputScanner on the extracted text. */
+  scanResult: ScanResult;
+  /** File size in bytes. */
+  fileSize: number;
+  /** Whether the content was deemed safe. */
+  safe: boolean;
+}
+
 // ─── Top-Level Aegis ─────────────────────────────────────────────────────────
 
 export type PresetPolicy =
@@ -535,6 +702,12 @@ export interface AegisConfig {
   agentLoop?: AgentLoopConfig;
   /** HMAC message integrity configuration for detecting history manipulation (T15) */
   integrity?: MessageIntegrityConfig;
+  /** Auto-retry configuration for graceful retry with elevated security */
+  autoRetry?: AutoRetryConfig;
+  /** Multi-modal content scanning configuration (images, PDFs, audio, etc.) */
+  multiModal?: MultiModalConfig;
+  /** LLM-Judge configuration for intent alignment verification */
+  judge?: LLMJudgeConfig;
 }
 
 export interface RecoveryConfig {

@@ -22,6 +22,17 @@
   "main": "./dist/cli.cjs",
   "module": "./dist/cli.js",
   "types": "./dist/cli.d.ts",
+  "keywords": [
+    "aegis",
+    "cli",
+    "prompt-injection",
+    "security",
+    "llm",
+    "ai",
+    "red-team",
+    "testing",
+    "scanner"
+  ],
   "files": [
     "dist"
   ],

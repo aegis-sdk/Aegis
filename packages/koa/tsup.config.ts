@@ -1,16 +1,13 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/cli.ts"],
+  entry: ["src/index.ts"],
   format: ["esm", "cjs"],
   dts: true,
-  splitting: false,
+  splitting: true,
   sourcemap: true,
   clean: true,
   treeshake: true,
   minify: false,
-  banner: {
-    js: "#!/usr/bin/env node",
-  },
-  external: ["@aegis-sdk/core", "@aegis-sdk/testing"],
+  external: ["koa", "@aegis-sdk/core"],
 });

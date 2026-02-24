@@ -1,0 +1,2 @@
+# Override root gitignore — dist/index.html is the source, not a build artifact
+!dist/
