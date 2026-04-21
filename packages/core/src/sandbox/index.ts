@@ -6,6 +6,22 @@ const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 /**
+ * Symbol attached to sandbox results when extraction failed and the sandbox
+ * was running in failMode="open". Callers can use `didExtractionFail()` to
+ * distinguish a genuinely-empty result from a post-failure fallback.
+ */
+export const SANDBOX_EXTRACTION_FAILED = Symbol.for("aegis.sandbox.extractionFailed");
+
+/**
+ * Returns true if the given sandbox result is a fallback produced after a
+ * failed extraction (only possible when the sandbox runs in failMode="open").
+ */
+export function didExtractionFail(result: unknown): boolean {
+  if (result === null || typeof result !== "object") return false;
+  return (result as Record<PropertyKey, unknown>)[SANDBOX_EXTRACTION_FAILED] === true;
+}
+
+/**
  * Build the extraction prompt sent to the sandbox LLM.
  *
  * The prompt is designed so that even if the model is completely hijacked
@@ -301,7 +317,17 @@ export class Sandbox {
 
     // All retries exhausted
     if (this.failMode === "open") {
-      return buildDefaults(schema) as T;
+      const defaults = buildDefaults(schema) as Record<PropertyKey, unknown>;
+      // Mark the object so callers can distinguish a real empty result from
+      // a fallback produced after failed extraction. Non-enumerable so it
+      // does not pollute JSON.stringify() output.
+      Object.defineProperty(defaults, SANDBOX_EXTRACTION_FAILED, {
+        value: true,
+        enumerable: false,
+        writable: false,
+        configurable: false,
+      });
+      return defaults as T;
     }
 
     throw new Error(

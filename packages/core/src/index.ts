@@ -18,7 +18,7 @@ export type { OTelTransportConfig, OTelSpan, OTelCounter, OTelHistogram } from "
 export { FileTransport } from "./audit/file-transport.js";
 export type { FileTransportConfig } from "./audit/file-transport.js";
 export { ActionValidator, parseWindow } from "./validator/index.js";
-export { Sandbox } from "./sandbox/index.js";
+export { Sandbox, SANDBOX_EXTRACTION_FAILED, didExtractionFail } from "./sandbox/index.js";
 export { MessageSigner } from "./integrity/index.js";
 export { AlertingEngine } from "./alerting/index.js";
 export { TrajectoryAnalyzer } from "./scanner/trajectory.js";

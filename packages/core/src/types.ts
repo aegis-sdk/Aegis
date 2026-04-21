@@ -122,6 +122,7 @@ export type DetectionType =
   | "document_injection"
   | "llm_judge_rejected"
   | "intent_misalignment"
+  | "scanner_error"
   | "custom";
 
 export interface LanguageResult {
@@ -219,6 +220,12 @@ export interface InputScannerConfig {
   perplexityThreshold?: number;
   /** Full perplexity analyzer configuration (overrides perplexityThreshold if both set). */
   perplexityConfig?: PerplexityConfig;
+  /**
+   * Input length (in characters) above which a context-flooding detection fires.
+   * Raised from the legacy 10k default because long RAG contexts routinely
+   * exceeded it. Default: 50_000.
+   */
+  contextFloodingThreshold?: number;
 }
 
 // ─── Prompt Builder ──────────────────────────────────────────────────────────
@@ -414,7 +421,7 @@ export interface StreamMonitorConfig {
   customPatterns?: RegExp[];
   chunkStrategy?: ChunkStrategy;
   chunkSize?: number;
-  onViolation?: (violation: StreamViolation) => void;
+  onViolation?: (violation: StreamViolation) => void | Promise<void>;
 }
 
 export interface StreamViolation {

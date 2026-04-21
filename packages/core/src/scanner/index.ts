@@ -30,6 +30,7 @@ const DEFAULT_CONFIG: ResolvedScannerConfig = {
   entropyThreshold: 4.5,
   manyShotThreshold: 5,
   perplexityThreshold: 4.5,
+  contextFloodingThreshold: 50_000,
 };
 
 /**
@@ -75,15 +76,27 @@ export class InputScanner {
 
     // Step 3: Custom patterns
     for (const pattern of this.config.customPatterns) {
-      const match = normalized.match(pattern);
-      if (match) {
+      try {
+        const match = normalized.match(pattern);
+        if (match) {
+          detections.push({
+            type: "custom",
+            pattern: pattern.source,
+            matched: match[0] ?? "",
+            severity: "medium",
+            position: { start: match.index ?? 0, end: (match.index ?? 0) + (match[0]?.length ?? 0) },
+            description: `Custom pattern matched: ${pattern.source}`,
+          });
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
         detections.push({
-          type: "custom",
+          type: "scanner_error",
           pattern: pattern.source,
-          matched: match[0] ?? "",
-          severity: "medium",
-          position: { start: match.index ?? 0, end: (match.index ?? 0) + (match[0]?.length ?? 0) },
-          description: `Custom pattern matched: ${pattern.source}`,
+          matched: "",
+          severity: "critical",
+          position: { start: 0, end: normalized.length },
+          description: `Custom pattern evaluation threw: ${message}`,
         });
       }
     }
@@ -126,14 +139,14 @@ export class InputScanner {
     }
 
     // Step 7: Context flooding
-    if (normalized.length > 10000) {
+    if (normalized.length > this.config.contextFloodingThreshold) {
       detections.push({
         type: "context_flooding",
         pattern: "excessive_length",
         matched: `length=${normalized.length}`,
         severity: "medium",
         position: { start: 0, end: normalized.length },
-        description: `Input length (${normalized.length}) may be a context flooding attempt`,
+        description: `Input length (${normalized.length}) exceeds contextFloodingThreshold (${this.config.contextFloodingThreshold})`,
       });
     }
 
@@ -237,15 +250,30 @@ export class InputScanner {
     const patterns = this.getActivePatterns();
 
     for (const pattern of patterns) {
-      const match = text.match(pattern.pattern);
-      if (match) {
+      try {
+        const match = text.match(pattern.pattern);
+        if (match) {
+          detections.push({
+            type: pattern.type,
+            pattern: pattern.pattern.source,
+            matched: match[0] ?? "",
+            severity: pattern.severity,
+            position: { start: match.index ?? 0, end: (match.index ?? 0) + (match[0]?.length ?? 0) },
+            description: pattern.description,
+          });
+        }
+      } catch (error: unknown) {
+        // Fail closed: if regex execution throws (stack overflow on pathological
+        // input, engine bug, etc.), record a critical detection so the scanner
+        // result is unsafe rather than silently skipping the pattern.
+        const message = error instanceof Error ? error.message : String(error);
         detections.push({
-          type: pattern.type,
+          type: "scanner_error",
           pattern: pattern.pattern.source,
-          matched: match[0] ?? "",
-          severity: pattern.severity,
-          position: { start: match.index ?? 0, end: (match.index ?? 0) + (match[0]?.length ?? 0) },
-          description: pattern.description,
+          matched: "",
+          severity: "critical",
+          position: { start: 0, end: text.length },
+          description: `Pattern evaluation threw: ${message}`,
         });
       }
     }

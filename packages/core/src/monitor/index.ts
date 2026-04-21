@@ -109,7 +109,7 @@ export class StreamMonitor {
     let buffer = "";
 
     return new TransformStream<string, string>({
-      transform(chunk, controller) {
+      async transform(chunk, controller) {
         const combined = buffer + chunk;
 
         if (useRedaction) {
@@ -120,13 +120,13 @@ export class StreamMonitor {
 
           if (blockingViolations.length > 0) {
             const violation = blockingViolations[0];
-            if (violation) config.onViolation(violation);
+            if (violation) await safeNotify(config, violation);
             controller.terminate();
             return;
           }
 
           // Redact PII in the combined buffer before emitting
-          const redacted = redactPii(combined, piiPatterns, config);
+          const redacted = await redactPii(combined, piiPatterns, config);
 
           if (redacted.length > bufSize) {
             const emit = redacted.slice(0, redacted.length - bufSize);
@@ -141,7 +141,7 @@ export class StreamMonitor {
 
           if (violations.length > 0) {
             const violation = violations[0];
-            if (violation) config.onViolation(violation);
+            if (violation) await safeNotify(config, violation);
             controller.terminate();
             return;
           }
@@ -156,7 +156,7 @@ export class StreamMonitor {
         }
       },
 
-      flush(controller) {
+      async flush(controller) {
         if (buffer) {
           if (useRedaction) {
             // Final redaction pass on remaining buffer
@@ -165,18 +165,18 @@ export class StreamMonitor {
 
             if (blockingViolations.length > 0) {
               const violation = blockingViolations[0];
-              if (violation) config.onViolation(violation);
+              if (violation) await safeNotify(config, violation);
               controller.terminate();
               return;
             }
 
-            const redacted = redactPii(buffer, piiPatterns, config);
+            const redacted = await redactPii(buffer, piiPatterns, config);
             controller.enqueue(redacted);
           } else {
             const violations = scanForViolations(buffer, allPatterns, config);
             if (violations.length > 0) {
               const violation = violations[0];
-              if (violation) config.onViolation(violation);
+              if (violation) await safeNotify(config, violation);
               controller.terminate();
               return;
             }
@@ -263,11 +263,11 @@ export class StreamMonitor {
  *
  * Fires `onViolation` for each redacted match so callers can audit.
  */
-function redactPii(
+async function redactPii(
   text: string,
   piiPatterns: { pattern: RegExp; label: string }[],
   config: Required<StreamMonitorConfig>,
-): string {
+): Promise<string> {
   let result = text;
 
   for (const { pattern, label } of piiPatterns) {
@@ -277,7 +277,7 @@ function redactPii(
 
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(result)) !== null) {
-      config.onViolation({
+      await safeNotify(config, {
         type: "pii_detected",
         matched: match[0],
         position: match.index,
@@ -292,6 +292,23 @@ function redactPii(
   }
 
   return result;
+}
+
+/**
+ * Invoke the configured onViolation callback, awaiting any promise it returns.
+ * Errors thrown by the callback are logged to stderr but do not propagate —
+ * an audit-logging failure must not crash the stream.
+ */
+async function safeNotify(
+  config: Required<StreamMonitorConfig>,
+  violation: StreamViolation,
+): Promise<void> {
+  try {
+    await config.onViolation(violation);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[aegis] onViolation callback threw: ${message}`);
+  }
 }
 
 function scanForViolations(

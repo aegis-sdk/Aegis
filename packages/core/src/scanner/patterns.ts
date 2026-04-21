@@ -70,7 +70,7 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
   {
     type: "role_manipulation",
     pattern:
-      /pretend\s+(you\s+are|to\s+be|you're)\b.*(?:no\s+(?:safety|content\s+)?(?:features?|filters?|restrictions?|guardrails?|rules?|limits?)|without\s+(?:any\s+)?(?:rules?|restrictions?|guardrails?|limits?|safety))/i,
+      /pretend\s+(you\s+are|to\s+be|you're)\b[\s\S]{0,200}?(?:no\s+(?:safety|content\s+)?(?:features?|filters?|restrictions?|guardrails?|rules?|limits?)|without\s+(?:any\s+)?(?:rules?|restrictions?|guardrails?|limits?|safety))/i,
     severity: "critical",
     description: "Attempts to make model pretend to have no restrictions",
   },
@@ -92,7 +92,7 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
   {
     type: "role_manipulation",
     pattern:
-      /act\s+as\s+(if\s+you\s+are\s+)?.*(?:no\s+(?:safety|content\s+)?(?:features?|filters?|restrictions?|guardrails?|rules?|limits?)|without\s+(?:any\s+)?(?:rules?|restrictions?|guardrails?|limits?|safety))/i,
+      /act\s+as\s+(if\s+you\s+are\s+)?[\s\S]{0,200}?(?:no\s+(?:safety|content\s+)?(?:features?|filters?|restrictions?|guardrails?|rules?|limits?)|without\s+(?:any\s+)?(?:rules?|restrictions?|guardrails?|limits?|safety))/i,
     severity: "critical",
     description: "Attempts to make model act without restrictions",
   },

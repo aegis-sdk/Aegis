@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { Sandbox } from "../../packages/core/src/sandbox/index.js";
+import {
+  Sandbox,
+  didExtractionFail,
+  SANDBOX_EXTRACTION_FAILED,
+} from "../../packages/core/src/sandbox/index.js";
 import { quarantine } from "../../packages/core/src/quarantine/index.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -333,6 +337,21 @@ describe("Sandbox — fail modes", () => {
       active: false,
       mood: "happy", // First enum value
     });
+    // Sentinel lets downstream code distinguish a fallback from a real result.
+    expect(didExtractionFail(result)).toBe(true);
+    expect((result as Record<PropertyKey, unknown>)[SANDBOX_EXTRACTION_FAILED]).toBe(true);
+    // Sentinel must be non-enumerable so JSON.stringify does not leak it.
+    expect(JSON.stringify(result)).not.toContain("extractionFailed");
+    expect(JSON.stringify(result)).not.toContain("Symbol");
+  });
+
+  it("didExtractionFail returns false for genuine successful extraction", async () => {
+    const llmCall = mockLlm(JSON.stringify({ name: "Alice" }));
+    const sandbox = new Sandbox({ llmCall, failMode: "open" });
+    const result = await sandbox.extract(q("hi"), {
+      schema: { name: { type: "string" } },
+    });
+    expect(didExtractionFail(result)).toBe(false);
   });
 
   it("failMode=open uses custom default values when specified", async () => {

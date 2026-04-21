@@ -72,6 +72,59 @@ describe("StreamMonitor", () => {
     expect(onViolation.mock.calls[0]![0]!.type).toBe("canary_leak");
   });
 
+  it("does not crash when onViolation rejects", async () => {
+    // Silence the expected "callback threw" log so test output stays clean.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const monitor = new StreamMonitor({
+      canaryTokens: ["CANARY_ASYNC_FAIL"],
+      onViolation: async () => {
+        throw new Error("audit log unavailable");
+      },
+    });
+
+    const source = createTestStream(["leaking CANARY_ASYNC_FAIL now"]);
+    const transform = monitor.createTransform();
+    const piped = source.pipeThrough(transform);
+
+    // The stream should terminate cleanly even though the callback rejected.
+    try {
+      await consumeStream(piped);
+    } catch {
+      // Expected — stream terminated
+    }
+
+    expect(errorSpy).toHaveBeenCalled();
+    const loggedMessage = errorSpy.mock.calls[0]?.[0] as string | undefined;
+    expect(loggedMessage).toContain("audit log unavailable");
+    errorSpy.mockRestore();
+  });
+
+  it("awaits async onViolation before terminating the stream", async () => {
+    // Proves the await is real: the callback resolves before controller.terminate()
+    // completes, so audit writes have a chance to flush.
+    const order: string[] = [];
+    const monitor = new StreamMonitor({
+      canaryTokens: ["CANARY_ORDER"],
+      onViolation: async () => {
+        order.push("callback-start");
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        order.push("callback-end");
+      },
+    });
+
+    const source = createTestStream(["data CANARY_ORDER leak"]);
+    const transform = monitor.createTransform();
+    const piped = source.pipeThrough(transform);
+
+    try {
+      await consumeStream(piped);
+    } catch {
+      // Expected
+    }
+
+    expect(order).toEqual(["callback-start", "callback-end"]);
+  });
+
   it("detects canary tokens split across chunks", async () => {
     const onViolation = vi.fn();
     const monitor = new StreamMonitor({
