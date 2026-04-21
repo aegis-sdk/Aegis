@@ -38,5 +38,17 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "homepage": "https://github.com/aegis-sdk/aegis#readme",
+  "bugs": {
+    "url": "https://github.com/aegis-sdk/aegis/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aegis-sdk/aegis",
+    "directory": "packages/openai"
+  }
 }

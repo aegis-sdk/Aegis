@@ -52,5 +52,12 @@
   "sideEffects": false,
   "devDependencies": {
     "@types/node": "^25.2.3"
+  },
+  "homepage": "https://github.com/aegis-sdk/aegis#readme",
+  "bugs": {
+    "url": "https://github.com/aegis-sdk/aegis/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

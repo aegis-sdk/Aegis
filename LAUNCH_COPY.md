@@ -174,7 +174,7 @@ experimental_transform: aegis.createStreamTransform()
 
 Defense-in-depth means when one layer fails, the next catches it.
 
-8/ MIT licensed. 5,943 tests. 19 packages on npm.
+8/ MIT licensed. 5,959 tests. 17 packages on npm (plus the docs site).
 
 Built on security patterns from the last 40 years: taint tracking (Perl 1989), parameterized queries (SQL-92), CSP (W3C 2010), capability-based security (1966).
 

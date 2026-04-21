@@ -28,7 +28,7 @@ aegis/
 │   ├── dashboard/     # Audit log visualization dashboard
 │   └── docs/          # VitePress documentation site
 ├── tests/
-│   ├── unit/          # Unit tests (31 files, 5653 tests)
+│   ├── unit/          # Unit tests (43 files, 5,959 tests + 5 todo)
 │   ├── adversarial/   # Known attack pattern tests
 │   ├── benign/        # False positive prevention tests (5,000 queries)
 │   ├── fuzz/          # Template-based fuzzing (fast-check)
@@ -103,7 +103,7 @@ User Input → Quarantine → Input Scanner → [Adaptive Sandbox] → Prompt Bu
 
 - Test framework: **Vitest 4** (globals mode)
 - Tests live in `tests/` directory (not co-located with source)
-- 31 test files, 5,653 tests passing
+- 43 test files, 5,959 tests passing + 5 todo (documented semantic detection gaps)
 - Adversarial tests in `tests/adversarial/` verify detection of known attacks
 - Benign corpus in `tests/benign/` prevents false positives (5,000 queries)
 - Template-based fuzzing with `fast-check` in `tests/fuzz/`

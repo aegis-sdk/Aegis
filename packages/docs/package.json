@@ -1,6 +1,6 @@
 {
   "name": "@aegis-sdk/docs",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Aegis SDK documentation site",
   "type": "module",
