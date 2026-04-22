@@ -31,6 +31,7 @@ const DEFAULT_CONFIG: ResolvedScannerConfig = {
   manyShotThreshold: 5,
   perplexityThreshold: 4.5,
   contextFloodingThreshold: 50_000,
+  maxInputLength: 1_000_000,
 };
 
 /**
@@ -65,6 +66,28 @@ export class InputScanner {
    */
   scan(input: Quarantined<string>): ScanResult {
     const raw = input.value;
+
+    // Step 0: Enforce hard size cap. Unbounded inputs make every downstream
+    // stage (normalization, ~80 regexes, entropy, perplexity) pay O(n) work.
+    // When maxInputLength is 0 the cap is disabled.
+    if (this.config.maxInputLength > 0 && raw.length > this.config.maxInputLength) {
+      const detection: Detection = {
+        type: "context_flooding",
+        pattern: "max_input_length_exceeded",
+        matched: `length=${raw.length}`,
+        severity: "critical",
+        position: { start: 0, end: raw.length },
+        description: `Input length (${raw.length}) exceeds maxInputLength (${this.config.maxInputLength}); scan short-circuited`,
+      };
+      return {
+        safe: false,
+        score: 1,
+        detections: [detection],
+        normalized: raw,
+        language: { primary: "unknown", switches: [] },
+        entropy: { mean: 0, maxWindow: 0, anomalous: false },
+      };
+    }
 
     // Step 1: Normalize encoding to catch obfuscation
     const normalized = this.config.encodingNormalization ? normalizeEncoding(raw) : raw;

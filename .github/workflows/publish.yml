@@ -27,6 +27,16 @@ jobs:
       - run: pnpm build
       - run: pnpm test
 
+      # Write the npm auth token for publishing. We do this in CI instead of
+      # keeping the line in the committed .npmrc so local `pnpm install`
+      # doesn't spam a "Failed to replace env in config" warning whenever
+      # developers don't have NPM_TOKEN set.
+      - name: Configure npm auth
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Create Release PR or Publish
         id: changesets
         uses: changesets/action@v1

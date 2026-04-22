@@ -35,6 +35,19 @@ describe("normalizeEncoding()", () => {
     expect(normalizeEncoding("հello")).toBe("hello");
   });
 
+  it("normalizes a 100k-char input in under 100ms", () => {
+    // Perf regression guard: the single-pass regex implementation of
+    // replaceHomoglyphs should handle large inputs fast. An earlier
+    // char-by-char loop would have been slower.
+    const chunk = "the quick brown fox jumps over the lazy dog. ";
+    const input = chunk.repeat(Math.ceil(100_000 / chunk.length));
+    const start = Date.now();
+    const result = normalizeEncoding(input);
+    const elapsed = Date.now() - start;
+    expect(result.length).toBeGreaterThan(0);
+    expect(elapsed).toBeLessThan(100);
+  });
+
   it("decodes HTML entities", () => {
     expect(normalizeEncoding("&amp;")).toBe("&");
     expect(normalizeEncoding("&lt;script&gt;")).toBe("<script>");

@@ -226,6 +226,13 @@ export interface InputScannerConfig {
    * exceeded it. Default: 50_000.
    */
   contextFloodingThreshold?: number;
+  /**
+   * Hard cap on the input length (in characters) the scanner will evaluate.
+   * Anything longer is short-circuited with a critical detection and never
+   * reaches pattern matching or entropy/perplexity analysis. Set to 0 to
+   * disable the cap entirely. Default: 1_000_000 (~1 MB of UTF-16).
+   */
+  maxInputLength?: number;
 }
 
 // ─── Prompt Builder ──────────────────────────────────────────────────────────

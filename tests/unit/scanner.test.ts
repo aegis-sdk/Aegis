@@ -87,6 +87,25 @@ describe("InputScanner", () => {
       expect(result.detections.some((d) => d.type === "context_flooding")).toBe(false);
     });
 
+    it("short-circuits inputs above maxInputLength with a critical detection", () => {
+      const capped = new InputScanner({ sensitivity: "balanced", maxInputLength: 1000 });
+      const start = Date.now();
+      const result = capped.scan(q("x".repeat(5000)));
+      const elapsed = Date.now() - start;
+      expect(result.safe).toBe(false);
+      expect(result.score).toBe(1);
+      expect(result.detections).toHaveLength(1);
+      expect(result.detections[0]?.pattern).toBe("max_input_length_exceeded");
+      // Must bypass the expensive stages — should be effectively instant.
+      expect(elapsed).toBeLessThan(20);
+    });
+
+    it("maxInputLength=0 disables the cap", () => {
+      const uncapped = new InputScanner({ sensitivity: "balanced", maxInputLength: 0 });
+      const result = uncapped.scan(q("a benign sentence"));
+      expect(result.safe).toBe(true);
+    });
+
     it("flags context flooding when configured with a smaller threshold", () => {
       const strict = new InputScanner({ sensitivity: "balanced", contextFloodingThreshold: 500 });
       const result = strict.scan(q("x".repeat(1000)));

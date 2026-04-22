@@ -9,6 +9,8 @@
  * - ROT13 detection (heuristic, not auto-decoded)
  */
 
+import { INJECTION_KEYWORD_REGEX } from "./keywords.js";
+
 // Unicode homoglyphs that map to ASCII characters.
 // Curated from Unicode Consortium confusables.txt — covers the scripts
 // most commonly used in prompt-injection bypass attempts.
@@ -231,11 +233,6 @@ export function normalizeEncoding(input: string): string {
   return result;
 }
 
-// Keywords that suggest a decoded base64 string is an injection payload,
-// not an innocuous identifier or hash. Kept narrow to limit false positives.
-const BASE64_INJECTION_KEYWORDS =
-  /\b(ignore|disregard|override|forget|bypass|system|instruction|pretend|jailbreak|unrestricted|reveal|prompt)\b/i;
-
 function extractSuspiciousBase64(input: string): string[] {
   const tokens = input.match(/[A-Za-z0-9+/]{16,}={0,2}/g);
   if (!tokens) return [];
@@ -243,19 +240,32 @@ function extractSuspiciousBase64(input: string): string[] {
   const decoded: string[] = [];
   for (const token of tokens) {
     const candidate = tryDecodeBase64(token);
-    if (candidate && BASE64_INJECTION_KEYWORDS.test(candidate)) {
+    if (candidate && INJECTION_KEYWORD_REGEX.test(candidate)) {
       decoded.push(candidate);
     }
   }
   return decoded;
 }
 
+// Precompiled character class from the homoglyph map for single-pass
+// replacement. Built once at module load — re-generating on every call
+// would cost more than the map-based iteration it replaced.
+const HOMOGLYPH_REGEX = buildHomoglyphRegex();
+
+function buildHomoglyphRegex(): RegExp {
+  // Escape chars so they're safe inside a character class / alternation.
+  // Every key is a single code point (may be surrogate pair), so
+  // alternation is the right shape here.
+  const escaped = Object.keys(HOMOGLYPH_MAP).map((char) =>
+    char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+  );
+  // `u` flag so surrogate pairs (Mathematical Alphanumerics) are treated
+  // as single characters rather than matching either surrogate half.
+  return new RegExp(escaped.join("|"), "gu");
+}
+
 function replaceHomoglyphs(input: string): string {
-  let result = "";
-  for (const char of input) {
-    result += HOMOGLYPH_MAP[char] ?? char;
-  }
-  return result;
+  return input.replace(HOMOGLYPH_REGEX, (match) => HOMOGLYPH_MAP[match] ?? match);
 }
 
 function decodeHtmlEntities(input: string): string {
