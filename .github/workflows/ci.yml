@@ -96,3 +96,21 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test -- --reporter=verbose tests/adversarial/
+
+  benchmark-regression:
+    name: Benchmark Regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # Runs the accuracy benchmark then compares to the committed baseline.
+      # Fails if TPR drops >1pp, FPR rises >0.25pp, or mean latency doubles
+      # on the balanced profile. Update the baseline deliberately if a
+      # regression is intentional (cp accuracy-results.json accuracy-baseline.json).
+      - run: pnpm benchmark:regression
