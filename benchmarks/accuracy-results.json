@@ -2,9 +2,9 @@
   "permissive": {
     "adversarial": {
       "total": 76,
-      "detected": 40,
-      "tpr": 52.6,
-      "missedCount": 36,
+      "detected": 42,
+      "tpr": 55.3,
+      "missedCount": 34,
       "missed": [
         {
           "threat": "T1",
@@ -21,10 +21,6 @@
         {
           "threat": "T1",
           "description": "unrestricted AI alias"
-        },
-        {
-          "threat": "T2",
-          "description": "fake system tags"
         },
         {
           "threat": "T2",
@@ -108,10 +104,6 @@
         },
         {
           "threat": "T17",
-          "description": "repeat with analysis"
-        },
-        {
-          "threat": "T17",
           "description": "recursive repetition"
         },
         {
@@ -174,7 +166,7 @@
         },
         "T17": {
           "total": 5,
-          "detected": 0
+          "detected": 1
         },
         "T18": {
           "total": 4,
@@ -186,7 +178,7 @@
         },
         "T2": {
           "total": 6,
-          "detected": 4
+          "detected": 5
         },
         "T3": {
           "total": 5,
@@ -220,9 +212,9 @@
       "mean": "0.011ms",
       "p50": "0.007ms",
       "p95": "0.019ms",
-      "p99": "0.045ms",
+      "p99": "0.043ms",
       "min": "0.004ms",
-      "max": "3.190ms"
+      "max": "3.513ms"
     }
   },
   "balanced": {
@@ -308,11 +300,11 @@
     },
     "latency": {
       "mean": "0.017ms",
-      "p50": "0.014ms",
-      "p95": "0.024ms",
-      "p99": "0.031ms",
+      "p50": "0.015ms",
+      "p95": "0.023ms",
+      "p99": "0.028ms",
       "min": "0.006ms",
-      "max": "2.736ms"
+      "max": "2.763ms"
     }
   },
   "paranoid": {
@@ -408,9 +400,9 @@
       "mean": "0.015ms",
       "p50": "0.014ms",
       "p95": "0.023ms",
-      "p99": "0.029ms",
+      "p99": "0.028ms",
       "min": "0.006ms",
-      "max": "0.168ms"
+      "max": "0.156ms"
     }
   }
 }

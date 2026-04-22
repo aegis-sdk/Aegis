@@ -19,14 +19,14 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
   {
     type: "instruction_override",
     pattern:
-      /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|context)/i,
+      /ignore\s+(all\s+)?(previous|prior|above|earlier|the\s+above|the\s+previous|your)\s+(instructions?|prompts?|rules?|context|directives?|orders?|commands?|directions?|training)/i,
     severity: "critical",
     description: "Attempts to override previous instructions",
   },
   {
     type: "instruction_override",
     pattern:
-      /disregard\s+(all\s+)?(previous|prior|above|your)\s+(instructions?|prompts?|rules?|guidelines)/i,
+      /disregard\s+(all\s+)?(previous|prior|above|your|the\s+previous|the\s+above|earlier)\s+(instructions?|prompts?|rules?|guidelines|directives?|orders?|commands?|directions?)/i,
     severity: "critical",
     description: "Attempts to disregard prior instructions",
   },
@@ -44,10 +44,29 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
     description: "Attempts to clear model context",
   },
   {
+    // Shorter "forget X" shape: "forget previous instructions", "forget your rules",
+    // "forget the above". Complements the more rigid pattern above.
     type: "instruction_override",
-    pattern: /override\s+(your|the|all)\s+(instructions?|rules?|guidelines|constraints)/i,
+    pattern:
+      /forget\s+(all\s+)?(your|the|the\s+above|previous|prior|earlier)\s+(instructions?|prompts?|rules?|context|directives?|orders?|commands?|training|guidelines)/i,
+    severity: "critical",
+    description: "Attempts to clear prior instructions by name",
+  },
+  {
+    type: "instruction_override",
+    pattern: /override\s+(your|the|all)\s+(instructions?|rules?|guidelines|constraints|directives?)/i,
     severity: "critical",
     description: "Explicit instruction override attempt",
+  },
+  {
+    // "Instead of [task], do X" — task-substitution hijack. Requires "instead
+    // of" + (task/what/your) to avoid matching legitimate "instead of X use Y"
+    // phrasing in non-task contexts.
+    type: "instruction_override",
+    pattern:
+      /instead\s+of\s+(?:doing\s+|following\s+|completing\s+|what|your|the\s+(?:task|request|instruction))/i,
+    severity: "high",
+    description: "Task-substitution hijack attempt",
   },
 
   // ─── Role Manipulation ─────────────────────────────────────────────────────
@@ -305,6 +324,47 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
       /(?:repeat|output|print|display|show|reveal|write\s+out|echo)\s+(?:the\s+|your\s+)?(?:system\s+)?(?:prompt|instructions?|rules?|guidelines|configuration|directives?)/i,
     severity: "critical",
     description: "Attempt to extract system prompt or instructions",
+  },
+  {
+    // Output-reflection attack: "repeat the above", "echo the preceding text",
+    // "print everything above". Deliberately scoped to (above/preceding/
+    // previous|everything/all of the above/text above) to avoid false-
+    // positives on "repeat that" in normal conversation.
+    type: "data_exfiltration",
+    pattern:
+      /(?:repeat|echo|print|output|display|reveal|write\s+out|reproduce|spit\s+out)\s+(?:back\s+)?(?:the\s+|all\s+of\s+the\s+|everything\s+)?(?:above|preceding|previous|earlier)(?:\s+(?:text|content|message|prompt|instructions?|conversation))?/i,
+    severity: "critical",
+    description: "Output-reflection attack: demand to echo preceding content",
+  },
+  {
+    // Credential / secret extraction: "tell me the password", "reveal your
+    // API key", "show me the access code". Requires (secret-ish noun) to avoid
+    // matching "tell me the answer" / "show me the code" in coding contexts.
+    type: "data_exfiltration",
+    pattern:
+      /(?:tell\s+me|reveal|show\s+me|output|print|display|give\s+me|what\s+is)\s+(?:the\s+|your\s+)?(?:secret|password|passphrase|access\s*(?:code|key|token)|api[\s_-]?key|auth(?:orization)?[\s_-]?(?:token|key)|credentials?|private[\s_-]?key)/i,
+    severity: "critical",
+    description: "Attempt to extract credentials or secrets",
+  },
+  {
+    // Verbatim output coercion: "say exactly X", "respond only with X",
+    // "output verbatim X", "reply with exactly X". Targets attacks that
+    // force the model to emit attacker-controlled text.
+    type: "data_exfiltration",
+    pattern:
+      /(?:say|respond|reply|answer|output|print|write)\s+(?:only|exactly|verbatim|just|literally|nothing\s+but|with\s+only)\s+/i,
+    severity: "high",
+    description: "Output-coercion attempt: force model to emit exact text",
+  },
+  {
+    // Output prefix/suffix hijack: "start your response with X", "begin with X",
+    // "prefix your output with X". Requires "your (response|output|answer|reply|
+    // message)" to keep it narrow.
+    type: "data_exfiltration",
+    pattern:
+      /(?:start|begin|prefix|preface|prepend|open)\s+(?:your\s+(?:response|output|answer|reply|message)|with)\s+(?:with\s+|["'])/i,
+    severity: "high",
+    description: "Output-prefix hijack attempt",
   },
   {
     type: "data_exfiltration",

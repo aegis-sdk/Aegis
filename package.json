@@ -27,6 +27,7 @@
     "benchmark": "vitest bench",
     "benchmark:accuracy": "tsx benchmarks/accuracy.ts",
     "benchmark:regression": "tsx benchmarks/accuracy.ts && tsx scripts/check-benchmark-regression.ts",
+    "eval:external": "tsx evals/external-corpora/run-all.ts",
     "sync-patterns": "tsx scripts/sync-patterns.ts"
   },
   "pnpm": {

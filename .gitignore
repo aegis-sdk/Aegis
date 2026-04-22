@@ -34,3 +34,7 @@ pnpm-debug.log*
 # Temp
 tmp/
 temp/
+
+# Eval corpora caches (raw third-party data, not redistributed)
+.cache/
+evals/external-results/raw/
