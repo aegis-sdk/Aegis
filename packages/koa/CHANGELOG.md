@@ -1,5 +1,15 @@
 # @aegis-sdk/koa
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [d82b3e4]
+- Updated dependencies [8748c08]
+- Updated dependencies [d548a7b]
+- Updated dependencies [df62e24]
+  - @aegis-sdk/core@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes
