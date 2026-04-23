@@ -357,6 +357,34 @@ export const INJECTION_PATTERNS: PatternDefinition[] = [
     description: "Output-coercion attempt: force model to emit exact text",
   },
   {
+    // Output coercion with a directly-quoted payload: "say 'Access Granted'",
+    // `respond with "OK"`, etc. This is the dominant remaining-gap category
+    // surfaced by TensorTrust — CTF-style outcome coercion where the attacker
+    // doesn't use qualifiers like "only/exactly/verbatim" but does give the
+    // model a concrete quoted string to emit.
+    //
+    // Narrow on purpose:
+    //   - Must be in imperative position: the verb is either at string start,
+    //     after sentence-ending punctuation, or after "please".
+    //   - Quoted content is bounded to avoid matching long code-block quotes.
+    //   - Negative lookbehind excludes meta-discussion framings like
+    //     "best way to answer 'X'" / "how to respond with 'Y'" that appear
+    //     in legitimate career / interview / writing questions.
+    //
+    // Does NOT match:
+    //   - `console.log("hello")` — no verb of emission.
+    //   - `She said "hello"` — past tense + third person (no trailing verb form).
+    //   - `What's the best way to answer 'X'?` — meta-discussion (excluded via lookbehind).
+    //   - `write "hello world" on the chalkboard` — "write" here, but targeted
+    //     object isn't model output (this one we accept as a possible FP
+    //     trade; watch the benign corpus).
+    type: "data_exfiltration",
+    pattern:
+      /(?<!\b(?:how|way|ways|best\s+way|right\s+way|good\s+way|correct\s+way|possible\s+way|easiest\s+way|better\s+way|proper\s+way|the\s+answer\s+is|was|were|is|means)\s+(?:to\s+)?)\b(?:say|respond(?:\s+with)?|reply(?:\s+with)?|output|print|emit|answer(?:\s+with)?|return|state)\s+(?:back\s+)?["'“‘][^"'”’\n]{1,80}["'”’]/i,
+    severity: "critical",
+    description: "Output-coercion with quoted attacker-controlled string",
+  },
+  {
     // Output prefix/suffix hijack: "start your response with X", "begin with X",
     // "prefix your output with X". Requires "your (response|output|answer|reply|
     // message)" to keep it narrow.

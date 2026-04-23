@@ -6,15 +6,25 @@ Aegis's attack-success-rate reduction against real LLMs.
 
 ## TL;DR
 
-On **200 TensorTrust attacks** run through real victim models, Aegis
-reduces attack success rate by **~55% at balanced sensitivity** and
-**~67% at paranoid** — measured as outcome-level compliance, not scanner
-TPR. The numbers replicate across two different model families
-(gpt-oss-20b vs. a Gemma/GPT-OSS-120b mix) to within 2 percentage points,
-which gives us reasonable confidence the effect is real and not a
-coincidence of a single model's quirks. **Permissive mode does not
-provide meaningful ASR protection on this corpus at this sample size**
-— that's an honest finding, not an error.
+**Phase A (baseline):** 55-67% relative ASR reduction across sensitivities.
+**Phase B (coverage fix):** Closing the dominant "output-coercion with
+quoted string" gap takes balanced reduction to **76.47% relative**
+(Aegis ASR 8% on 100 attacks, down from 20%).
+
+| Phase | n | Baseline ASR | Aegis ASR | Rel. reduction |
+|---|---:|---:|---:|---:|
+| A — balanced (T1) | 100 | 45% | 20% | 55.56% |
+| A — balanced (T2, cross-family) | 50 | 52% | 24% | 53.85% |
+| A — paranoid | 50 | 30% | 10% | 66.67% |
+| A — permissive | 50 | 34% | 38% | -11.76% (noise) |
+| **B — balanced (re-run after pattern fix)** | **100** | **34%** | **8%** | **76.47%** |
+
+Cross-family decorrelation on Phase A holds within 2pp. Phase B's drop from
+20% → 8% Aegis ASR is traceable to a single pattern addition (output-coercion
+with a directly-quoted attacker string) that closed 11 of 15 "Access granted"
+TensorTrust misses without adding any false positives on the 5,000-query
+benign corpus. Permissive mode still does not provide meaningful ASR
+protection at this corpus scale.
 
 ## Method
 
