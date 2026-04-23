@@ -65,18 +65,23 @@ Aegis's deterministic scanner is pattern-and-heuristic based. It catches the ove
   the user's stated intent. If rejected, the user sees a redaction marker
   instead of the manipulated output.
 
-First scaled measurement (2026-04-23, 200 TensorTrust attacks across two
-model families):
+Scaled measurement (2026-04-23, TensorTrust corpus across multiple model
+families, balanced sensitivity unless noted):
 
-| Sensitivity | n | Baseline ASR | Aegis ASR | Relative reduction |
+| Phase | n | Baseline ASR | Aegis ASR | Relative reduction |
 |---|---:|---:|---:|---:|
-| permissive | 50 | 34.00% | 38.00% | -11.76% (sampling noise) |
-| balanced (triple 1) | 100 | 45.00% | 20.00% | **55.56%** |
-| balanced (triple 2) | 50 | 52.00% | 24.00% | **53.85%** |
-| paranoid | 50 | 30.00% | 10.00% | **66.67%** |
+| A permissive | 50 | 34.00% | 38.00% | -11.76% (sampling noise) |
+| A balanced (T1 gpt-oss-20b) | 100 | 45.00% | 20.00% | 55.56% |
+| A balanced (T2 cross-family) | 50 | 52.00% | 24.00% | 53.85% |
+| A paranoid | 50 | 30.00% | 10.00% | **66.67%** |
+| **B balanced (T1, pattern fix)** | 100 | 34.00% | **8.00%** | **76.47%** |
+| **B balanced (T3 cross-family, pattern fix)** | 50 | 46.00% | **4.00%** | **91.30%** |
 
-Cross-family agreement (triple 1 vs. triple 2) within 2 percentage
-points on balanced — the defense is not a single-model artifact.
+Phase A cross-family agreement on balanced is within 2pp. Phase B
+cross-family validation (T3: NVIDIA Nemotron victim + OpenAI GPT-OSS-120b
+judge + Z.AI GLM-4.5-air compliance) shows the new output-coercion
+pattern is not a single-model artifact — the reduction replicates
+across three distinct model families and three distinct hosts.
 Permissive mode does not provide meaningful ASR protection at this
 corpus and scale; prefer balanced as the default. Full methodology,
 caveats, and reproduction instructions in

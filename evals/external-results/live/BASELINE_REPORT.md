@@ -10,6 +10,11 @@ Aegis's attack-success-rate reduction against real LLMs.
 **Phase B (coverage fix):** Closing the dominant "output-coercion with
 quoted string" gap takes balanced reduction to **76.47% relative**
 (Aegis ASR 8% on 100 attacks, down from 20%).
+**Cross-family validation:** Replicated independently on a triple with
+three different model families and three different hosts (NVIDIA Nemotron
+victim + OpenAI GPT-OSS-120b judge + Z.AI GLM-4.5-air compliance):
+**91.30% relative reduction** (Aegis ASR 4% on 50 attacks, baseline 46%).
+The Phase B pattern work is not a single-model artifact.
 
 | Phase | n | Baseline ASR | Aegis ASR | Rel. reduction |
 |---|---:|---:|---:|---:|
@@ -17,7 +22,8 @@ quoted string" gap takes balanced reduction to **76.47% relative**
 | A — balanced (T2, cross-family) | 50 | 52% | 24% | 53.85% |
 | A — paranoid | 50 | 30% | 10% | 66.67% |
 | A — permissive | 50 | 34% | 38% | -11.76% (noise) |
-| **B — balanced (re-run after pattern fix)** | **100** | **34%** | **8%** | **76.47%** |
+| **B — balanced (T1, pattern fix)** | **100** | **34%** | **8%** | **76.47%** |
+| **B — balanced (T3, cross-family, pattern fix)** | **50** | **46%** | **4%** | **91.30%** |
 
 Cross-family decorrelation on Phase A holds within 2pp. Phase B's drop from
 20% → 8% Aegis ASR is traceable to a single pattern addition (output-coercion
@@ -55,6 +61,31 @@ The two triples agree to within **2 percentage points on relative
 reduction**, despite using entirely different model families and
 providers. That's the strongest signal in this report: the defense
 isn't an artifact of any one model's quirks.
+
+### Phase B cross-family validation (2026-04-23, later same day)
+
+Rerun of the Phase B pattern against a deliberately-distinct triple:
+
+- Victim: `nvidia/nemotron-nano-9b-v2:free` (NVIDIA-hosted, 9B)
+- Judge: `openai/gpt-oss-120b:free` (Novita-hosted)
+- Compliance: `z-ai/glm-4.5-air:free` (Z.AI-hosted)
+
+| n | Baseline ASR | Aegis ASR | Blocked@input | Rel. reduction |
+|---:|---:|---:|---:|---:|
+| 50 | **46.00%** | **4.00%** | 44 | **91.30%** |
+
+Triple 1 (gpt-oss-20b all, same corpus, same pattern set) showed
+76.47% relative reduction at Aegis ASR 8%. This independent triple
+shows 91.30% at Aegis ASR 4%. **Magnitude differs, direction and
+dominance of the pattern-set's effect replicates.** The Phase B work
+is not an artifact of the gpt-oss-20b model family.
+
+Note on model availability: several free-tier models were rate-limited
+during this run (Gemma-12b, Gemma-27b, Qwen-80b, Llama-70b, Hermes-405b
+all returned upstream 429s). The triple above was assembled from the
+free models that were live and responsive at measurement time. Future
+reproductions should expect to retry with whichever free triple is
+currently up.
 
 ### Sensitivity sweep — triple 1 (gpt-oss-20b all)
 

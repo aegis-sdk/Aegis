@@ -19,12 +19,14 @@ balanced and ~67% at paranoid across 200 TensorTrust attacks. Two
 independent model triples agree to within 2 percentage points on
 relative reduction — the defense is not a single-model artifact.
 
-| Sensitivity | n | Baseline ASR | Aegis ASR | Reduction (rel) |
-|---|---:|---:|---:|---:|
-| permissive | 50 | 34.00% | 38.00% | **-11.76%** (noise) |
-| balanced (triple 1) | 100 | 45.00% | 20.00% | **55.56%** |
-| balanced (triple 2, cross-family) | 50 | 52.00% | 24.00% | **53.85%** |
-| paranoid | 50 | 30.00% | 10.00% | **66.67%** |
+| Phase | Sensitivity | n | Baseline ASR | Aegis ASR | Reduction (rel) |
+|---|---|---:|---:|---:|---:|
+| A | permissive | 50 | 34.00% | 38.00% | **-11.76%** (noise) |
+| A | balanced (T1) | 100 | 45.00% | 20.00% | **55.56%** |
+| A | balanced (T2, cross-family) | 50 | 52.00% | 24.00% | **53.85%** |
+| A | paranoid | 50 | 30.00% | 10.00% | **66.67%** |
+| B | balanced (T1, post-pattern-fix) | 100 | 34.00% | 8.00% | **76.47%** |
+| B | balanced (T3 cross-family, post-pattern-fix) | 50 | 46.00% | 4.00% | **91.30%** |
 
 ## How to reproduce
 
