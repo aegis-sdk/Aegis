@@ -136,9 +136,40 @@ export class Aegis {
       const quarantined = quarantine(msg.content, { source: "user_input" });
       const result = this.scanner.scan(quarantined);
 
+      // Judge second-pass: only on scanner-unsafe inputs within the grey band.
+      // Above band.high, block outright without the judge call. In the band,
+      // the judge can override an unsafe scanner verdict. Scanner-safe inputs
+      // always pass without judge cost.
+      let finalSafe = result.safe;
+      if (!result.safe && this.judge) {
+        const bandDecision = this.judge.classify(result.score);
+        if (bandDecision === "judge") {
+          const verdict = await this.judge.evaluateInput(msg.content, {
+            detections: result.detections,
+            riskScore: result.score,
+          });
+          this.audit.log({
+            event: "judge_evaluation",
+            decision: verdict.approved ? "allowed" : "blocked",
+            context: {
+              phase: "input",
+              scannerScore: result.score,
+              judgeDecision: verdict.decision,
+              judgeConfidence: verdict.confidence,
+              judgeReasoning: verdict.reasoning,
+              executionTimeMs: verdict.executionTimeMs,
+            },
+          });
+          if (verdict.approved) {
+            finalSafe = true;
+          }
+        }
+        // bandDecision === "block" → leave finalSafe false, skip the judge call
+      }
+
       this.audit.log({
-        event: result.safe ? "scan_pass" : "scan_block",
-        decision: result.safe ? "allowed" : "blocked",
+        event: finalSafe ? "scan_pass" : "scan_block",
+        decision: finalSafe ? "allowed" : "blocked",
         context: {
           score: result.score,
           detections: result.detections.length,
@@ -146,7 +177,7 @@ export class Aegis {
         },
       });
 
-      if (!result.safe) {
+      if (!finalSafe) {
         return this.handleRecovery(messages, msg, result);
       }
     }
@@ -279,6 +310,118 @@ export class Aegis {
    */
   createStreamTransform(): TransformStream<string, string> {
     return this.monitor.createTransform();
+  }
+
+  /**
+   * Create a TransformStream that buffers LLM output, runs it through the
+   * configured LLM judge, and only emits if the judge approves.
+   *
+   * Use this when you want stronger output-phase defense than the
+   * pattern-based `StreamMonitor` alone provides. The judge sees the
+   * complete output and the original user request, so it can catch cases
+   * where the model was steered into producing harmful content without
+   * tripping canary or PII patterns.
+   *
+   * Modes:
+   * - **`buffer` (default)**: accumulate tokens until the stream ends,
+   *   then call the judge. Emit nothing if the judge rejects. Safe —
+   *   user never sees blocked content. Latency = full generation +
+   *   judge eval (~500ms).
+   * - **`passthrough`**: forward tokens live (like `createStreamTransform`),
+   *   then still call the judge at end of stream. If the judge rejects,
+   *   an audit event is emitted but the user has already seen the output.
+   *   Useful for monitoring / logging without delaying UX.
+   *
+   * Requires an `LLMJudge` configured on this Aegis instance. Throws if
+   * invoked without one.
+   *
+   * @param userRequest - The original user input (used as the intent
+   *   reference for the judge's alignment check). Usually the most
+   *   recent user message.
+   * @param options - Judge mode and optional max-buffer cap.
+   */
+  createJudgedStreamTransform(
+    userRequest: string,
+    options: { mode?: "buffer" | "passthrough"; maxBufferSize?: number } = {},
+  ): TransformStream<string, string> {
+    if (!this.judge) {
+      throw new Error(
+        "[aegis] createJudgedStreamTransform requires an LLMJudge. Configure Aegis with { judge: { llmCall: ... } }.",
+      );
+    }
+
+    const judge = this.judge;
+    const audit = this.audit;
+    const mode = options.mode ?? "buffer";
+    const maxBufferSize = options.maxBufferSize ?? 64 * 1024; // 64 KiB default cap
+
+    let buffer = "";
+
+    return new TransformStream<string, string>({
+      transform(chunk, controller) {
+        buffer += chunk;
+
+        // Enforce a hard cap so a runaway generation doesn't OOM the host.
+        // When exceeded, truncate the buffer and continue — the judge sees
+        // a truncated sample, which is a documented limitation.
+        if (buffer.length > maxBufferSize) {
+          buffer = buffer.slice(-maxBufferSize);
+        }
+
+        // Passthrough mode: emit tokens live, judging happens on flush.
+        if (mode === "passthrough") {
+          controller.enqueue(chunk);
+        }
+        // Buffer mode: hold everything until flush.
+      },
+
+      async flush(controller) {
+        if (buffer.length === 0) {
+          return;
+        }
+
+        const verdict = await judge.evaluate(userRequest, buffer);
+
+        audit.log({
+          event: "judge_evaluation",
+          decision: verdict.approved ? "allowed" : "blocked",
+          context: {
+            phase: "output",
+            judgeDecision: verdict.decision,
+            judgeConfidence: verdict.confidence,
+            judgeReasoning: verdict.reasoning,
+            executionTimeMs: verdict.executionTimeMs,
+            outputLength: buffer.length,
+            mode,
+          },
+        });
+
+        if (verdict.approved) {
+          // Buffer mode: emit the held content now that the judge approved.
+          // Passthrough mode: tokens were already emitted; nothing left to do.
+          if (mode === "buffer") {
+            controller.enqueue(buffer);
+          }
+          return;
+        }
+
+        // Judge rejected.
+        if (mode === "buffer") {
+          // User never saw the output — emit a redaction marker instead.
+          controller.enqueue(
+            `[aegis: output withheld by judge — ${verdict.decision} (${verdict.reasoning})]`,
+          );
+        } else {
+          // Passthrough mode: user already saw the output. Append a marker
+          // so the client surface can react; but nothing prevents what was
+          // already delivered. This is the documented trade-off of
+          // passthrough mode.
+          controller.enqueue(
+            `\n[aegis: judge flagged this response post-hoc — ${verdict.decision} (${verdict.reasoning})]`,
+          );
+        }
+      },
+    });
   }
 
   /**

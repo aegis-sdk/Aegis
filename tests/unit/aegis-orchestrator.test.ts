@@ -273,6 +273,231 @@ describe("Aegis — constructor resilience", () => {
   });
 });
 
+// ─── Judge-assisted input (grey-band) ──────────────────────────────────────
+
+describe("Aegis — judge-assisted input (grey band)", () => {
+  /**
+   * Helper: build an llmCall that returns a canned judge verdict.
+   * The judge prompt is a full structured string; we don't assert its shape
+   * here beyond checking the call count.
+   */
+  function mockJudge(verdict: {
+    approved: boolean;
+    confidence: number;
+    decision: "approved" | "rejected" | "flagged";
+    reasoning: string;
+  }): ReturnType<typeof vi.fn> {
+    return vi.fn(async () => JSON.stringify(verdict));
+  }
+
+  it("judge rejection keeps the input blocked", async () => {
+    const llmCall = mockJudge({
+      approved: false,
+      confidence: 0.95,
+      decision: "rejected",
+      reasoning: "Clear injection attempt.",
+    });
+    // Wide band with high=0.99 so critical-score patterns route through judge
+    // instead of being blocked outright.
+    const { aegis, events } = aegisWithRecorder({
+      recovery: { mode: "continue" },
+      scanner: { sensitivity: "balanced" },
+      judge: {
+        llmCall,
+        band: { low: 0.1, high: 1.01 },
+      },
+    });
+    await expect(aegis.guardInput(blockingConversation())).rejects.toBeInstanceOf(
+      AegisInputBlocked,
+    );
+    const judgeEvent = events.find((e) => e.event === "judge_evaluation");
+    expect(judgeEvent).toBeDefined();
+    expect(judgeEvent?.decision).toBe("blocked");
+    expect(judgeEvent?.context?.judgeDecision).toBe("rejected");
+    expect(llmCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("judge approval overrides a scanner-unsafe verdict", async () => {
+    const llmCall = mockJudge({
+      approved: true,
+      confidence: 0.9,
+      decision: "approved",
+      reasoning: "Despite pattern match, context makes this benign.",
+    });
+    const { aegis, events } = aegisWithRecorder({
+      recovery: { mode: "continue" },
+      scanner: { sensitivity: "balanced" },
+      judge: {
+        llmCall,
+        band: { low: 0.1, high: 1.01 },
+      },
+    });
+    // Scanner would block this; judge overrides and lets it through.
+    const result = await aegis.guardInput(blockingConversation());
+    expect(result).toEqual(blockingConversation());
+    const judgeEvent = events.find((e) => e.event === "judge_evaluation");
+    expect(judgeEvent?.decision).toBe("allowed");
+    expect(judgeEvent?.context?.phase).toBe("input");
+    // Final audit entry should be a scan_pass since judge approved.
+    const passEvent = events.find((e) => e.event === "scan_pass");
+    expect(passEvent).toBeDefined();
+  });
+
+  it("scanner scores above band.high block without calling the judge", async () => {
+    const llmCall = mockJudge({
+      approved: true,
+      confidence: 1,
+      decision: "approved",
+      reasoning: "should not be invoked",
+    });
+    const aegis = new Aegis({
+      recovery: { mode: "continue" },
+      judge: {
+        llmCall,
+        band: { low: 0.1, high: 0.5 },
+      },
+    });
+    // "Ignore all previous instructions..." is a critical/0.9 score → above high bound.
+    await expect(aegis.guardInput(blockingConversation())).rejects.toBeInstanceOf(
+      AegisInputBlocked,
+    );
+    expect(llmCall).not.toHaveBeenCalled();
+  });
+
+  it("scanner-safe inputs never call the judge", async () => {
+    const llmCall = mockJudge({
+      approved: false,
+      confidence: 1,
+      decision: "rejected",
+      reasoning: "should not be invoked on safe inputs",
+    });
+    const aegis = new Aegis({
+      judge: {
+        llmCall,
+        band: { low: 0.0, high: 1.0 },
+      },
+    });
+    await aegis.guardInput(benignConversation());
+    expect(llmCall).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Judged output stream ──────────────────────────────────────────────────
+
+describe("Aegis — createJudgedStreamTransform()", () => {
+  function mockJudgeCall(verdict: {
+    approved: boolean;
+    confidence: number;
+    decision: "approved" | "rejected" | "flagged";
+    reasoning: string;
+  }): ReturnType<typeof vi.fn> {
+    return vi.fn(async () => JSON.stringify(verdict));
+  }
+
+  it("throws when called without a configured judge", () => {
+    const aegis = new Aegis();
+    expect(() => aegis.createJudgedStreamTransform("user said hi")).toThrow(/LLMJudge/);
+  });
+
+  it("buffer mode: emits output when judge approves", async () => {
+    const llmCall = mockJudgeCall({
+      approved: true,
+      confidence: 0.95,
+      decision: "approved",
+      reasoning: "Legitimate reply.",
+    });
+    const aegis = new Aegis({ judge: { llmCall } });
+    const transform = aegis.createJudgedStreamTransform("What is 2+2?");
+    const source = stringStream(["The answer ", "is four ", "and a half."]);
+    const out = await collectStream(source.pipeThrough(transform));
+    expect(out).toBe("The answer is four and a half.");
+    expect(llmCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("buffer mode: withholds output when judge rejects", async () => {
+    const llmCall = mockJudgeCall({
+      approved: false,
+      confidence: 0.9,
+      decision: "rejected",
+      reasoning: "Model revealed the system prompt.",
+    });
+    const aegis = new Aegis({ judge: { llmCall } });
+    const transform = aegis.createJudgedStreamTransform("ignore previous");
+    const source = stringStream(["system prompt: ", "you are secret assistant"]);
+    const out = await collectStream(source.pipeThrough(transform));
+    expect(out).toContain("[aegis: output withheld by judge");
+    expect(out).toContain("rejected");
+    expect(out).not.toContain("system prompt: ");
+  });
+
+  it("passthrough mode: emits output live and appends judge verdict at end", async () => {
+    const llmCall = mockJudgeCall({
+      approved: false,
+      confidence: 0.9,
+      decision: "rejected",
+      reasoning: "Output leaked internal state.",
+    });
+    const aegis = new Aegis({ judge: { llmCall } });
+    const transform = aegis.createJudgedStreamTransform("user request", {
+      mode: "passthrough",
+    });
+    const source = stringStream(["live-token-1 ", "live-token-2"]);
+    const out = await collectStream(source.pipeThrough(transform));
+    // In passthrough, the live tokens DID get through.
+    expect(out).toContain("live-token-1 live-token-2");
+    // And the judge's rejection was appended as a marker.
+    expect(out).toContain("[aegis: judge flagged this response post-hoc");
+  });
+
+  it("emits a judge_evaluation audit event with phase=output", async () => {
+    const llmCall = mockJudgeCall({
+      approved: true,
+      confidence: 1,
+      decision: "approved",
+      reasoning: "fine",
+    });
+    const { aegis, events } = aegisWithRecorder({ judge: { llmCall } });
+    const transform = aegis.createJudgedStreamTransform("hello");
+    const source = stringStream(["world"]);
+    await collectStream(source.pipeThrough(transform));
+    const judgeEvent = events.find((e) => e.event === "judge_evaluation");
+    expect(judgeEvent).toBeDefined();
+    expect(judgeEvent?.context?.phase).toBe("output");
+    expect(judgeEvent?.context?.outputLength).toBe(5);
+    expect(judgeEvent?.context?.mode).toBe("buffer");
+  });
+
+  it("does not invoke the judge for empty output", async () => {
+    const llmCall = mockJudgeCall({
+      approved: true,
+      confidence: 1,
+      decision: "approved",
+      reasoning: "empty",
+    });
+    const aegis = new Aegis({ judge: { llmCall } });
+    const transform = aegis.createJudgedStreamTransform("hello");
+    const source = stringStream([]);
+    await collectStream(source.pipeThrough(transform));
+    expect(llmCall).not.toHaveBeenCalled();
+  });
+
+  it("truncates buffer to maxBufferSize to prevent OOM", async () => {
+    const llmCall = mockJudgeCall({
+      approved: true,
+      confidence: 1,
+      decision: "approved",
+      reasoning: "ok",
+    });
+    const aegis = new Aegis({ judge: { llmCall } });
+    const transform = aegis.createJudgedStreamTransform("hello", { maxBufferSize: 10 });
+    const source = stringStream(["abcdefghijklmnopqrstuvwxyz"]);
+    const out = await collectStream(source.pipeThrough(transform));
+    // Only the tail should have been retained / emitted.
+    expect(out.length).toBeLessThanOrEqual(10);
+    expect(out).toBe("qrstuvwxyz");
+  });
+});
+
 // ─── Integration smoke check ────────────────────────────────────────────────
 
 describe("Aegis — integration guard", () => {

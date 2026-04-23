@@ -54,7 +54,27 @@ Aegis's deterministic scanner is pattern-and-heuristic based. It catches the ove
 5. **Keyword-free obfuscation** — attacks that rely entirely on phrasing variation and contextual framing with no recognizable markers.
 6. **Marginal-perplexity adversarial suffixes** — GCG-style suffixes that stay close enough to natural-language entropy to slip under the perplexity threshold.
 
-**Mitigation**: Enable `LLMJudge` in your Aegis config for intent-alignment verification. The judge uses a small LLM to evaluate whether the response aligns with the user's stated goal — it catches the semantic categories above that patterns cannot.
+**Mitigation**: Enable `LLMJudge` in your Aegis config. Two integration points:
+
+- **Input phase** — `Aegis.guardInput()` routes scanner-unsafe inputs whose
+  score falls inside the judge's grey band (default `[0.25, 0.75]`) through
+  the judge for a second opinion. Above the band, inputs are blocked
+  without paying for a judge call; below the band, they pass.
+- **Output phase** — `Aegis.createJudgedStreamTransform(userRequest)` buffers
+  the model's response and asks the judge whether the output aligns with
+  the user's stated intent. If rejected, the user sees a redaction marker
+  instead of the manipulated output.
+
+Early measurement on a 10-payload TensorTrust smoke run with
+`openai/gpt-oss-20b:free` as victim, judge, and compliance detector:
+
+- Baseline attack-success rate (no Aegis): **80%**
+- With Aegis (balanced): **20%** — 8 blocked at input, 2 got through
+- ASR reduction: **60 percentage points** (75% relative)
+
+These numbers are a sanity check only — treat them as a floor on what a
+larger evaluation would show, not a generalizable claim. See
+`evals/external-results/live/README.md` for caveats.
 
 ### Supported Versions
 

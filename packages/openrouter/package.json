@@ -1,0 +1,53 @@
+{
+  "name": "@aegis-sdk/openrouter",
+  "version": "0.5.0",
+  "description": "OpenRouter adapter for Aegis — free-tier judge + victim models for eval harnesses",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@aegis-sdk/core": "workspace:*"
+  },
+  "dependencies": {
+    "@aegis-sdk/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "sideEffects": false,
+  "homepage": "https://github.com/aegis-sdk/aegis#readme",
+  "bugs": {
+    "url": "https://github.com/aegis-sdk/aegis/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aegis-sdk/aegis",
+    "directory": "packages/openrouter"
+  }
+}
