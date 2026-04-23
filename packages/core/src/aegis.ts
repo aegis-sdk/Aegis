@@ -58,6 +58,8 @@ export class Aegis {
   private judge: LLMJudge | null;
   private multiModal: MultiModalScanner | null;
   private sessionQuarantined = false;
+  private readonly judgeCallBudget: number;
+  private judgeCallsUsed = 0;
 
   /** Default privilege decay schedule */
   private static readonly DEFAULT_PRIVILEGE_DECAY: Record<number, number> = {
@@ -85,6 +87,7 @@ export class Aegis {
     this.retryHandler = config.autoRetry?.enabled ? new AutoRetryHandler(config.autoRetry) : null;
     this.judge =
       config.judge?.llmCall && config.judge?.enabled !== false ? new LLMJudge(config.judge) : null;
+    this.judgeCallBudget = config.judgeCallBudget ?? 0;
     this.multiModal =
       config.multiModal?.extractText && config.multiModal?.enabled !== false
         ? new MultiModalScanner(config.multiModal)
@@ -140,28 +143,62 @@ export class Aegis {
       // Above band.high, block outright without the judge call. In the band,
       // the judge can override an unsafe scanner verdict. Scanner-safe inputs
       // always pass without judge cost.
+      //
+      // Two short-circuit conditions engage the breaker-fallback policy:
+      //   1. Judge circuit breaker is OPEN (provider degraded)
+      //   2. Per-session judge-call budget exhausted
+      // Fallback policy (onBreakerOpen):
+      //   scanner     → trust result.safe as the final verdict
+      //   fail-open   → mark the input safe (let it through)
+      //   fail-closed → keep the input unsafe (block it)
       let finalSafe = result.safe;
       if (!result.safe && this.judge) {
+        const breakerState = this.judge.getBreakerState();
         const bandDecision = this.judge.classify(result.score);
+        const budgetExhausted =
+          this.judgeCallBudget > 0 && this.judgeCallsUsed >= this.judgeCallBudget;
         if (bandDecision === "judge") {
-          const verdict = await this.judge.evaluateInput(msg.content, {
-            detections: result.detections,
-            riskScore: result.score,
-          });
-          this.audit.log({
-            event: "judge_evaluation",
-            decision: verdict.approved ? "allowed" : "blocked",
-            context: {
-              phase: "input",
-              scannerScore: result.score,
-              judgeDecision: verdict.decision,
-              judgeConfidence: verdict.confidence,
-              judgeReasoning: verdict.reasoning,
-              executionTimeMs: verdict.executionTimeMs,
-            },
-          });
-          if (verdict.approved) {
-            finalSafe = true;
+          if (breakerState === "open" || budgetExhausted) {
+            const fallback = this.judge.getBreakerFallback();
+            if (fallback === "fail-open") finalSafe = true;
+            // scanner and fail-closed both keep finalSafe = false (current value)
+            this.audit.log({
+              event: "judge_evaluation",
+              decision: finalSafe ? "allowed" : "blocked",
+              context: {
+                phase: "input",
+                scannerScore: result.score,
+                judgeSkipped: true,
+                skipReason: budgetExhausted ? "budget_exhausted" : "breaker_open",
+                breakerState,
+                breakerFallback: fallback,
+                judgeCallsUsed: this.judgeCallsUsed,
+                judgeCallBudget: this.judgeCallBudget,
+              },
+            });
+          } else {
+            this.judgeCallsUsed++;
+            const verdict = await this.judge.evaluateInput(msg.content, {
+              detections: result.detections,
+              riskScore: result.score,
+            });
+            this.audit.log({
+              event: "judge_evaluation",
+              decision: verdict.approved ? "allowed" : "blocked",
+              context: {
+                phase: "input",
+                scannerScore: result.score,
+                judgeDecision: verdict.decision,
+                judgeConfidence: verdict.confidence,
+                judgeReasoning: verdict.reasoning,
+                executionTimeMs: verdict.executionTimeMs,
+                breakerState,
+                judgeCallsUsed: this.judgeCallsUsed,
+              },
+            });
+            if (verdict.approved) {
+              finalSafe = true;
+            }
           }
         }
         // bandDecision === "block" → leave finalSafe false, skip the judge call
@@ -302,6 +339,28 @@ export class Aegis {
   }
 
   /**
+   * Snapshot of the judge's operational state for health checks,
+   * dashboards, and SLO monitoring. Returns null when no judge is
+   * configured.
+   */
+  getJudgeStats(): {
+    breakerState: "closed" | "open" | "half-open";
+    breakerFallback: "scanner" | "fail-open" | "fail-closed";
+    callsUsed: number;
+    callBudget: number;
+    latency: { count: number; mean: number; p50: number; p95: number; p99: number };
+  } | null {
+    if (!this.judge) return null;
+    return {
+      breakerState: this.judge.getBreakerState(),
+      breakerFallback: this.judge.getBreakerFallback(),
+      callsUsed: this.judgeCallsUsed,
+      callBudget: this.judgeCallBudget,
+      latency: this.judge.getLatencyStats(),
+    };
+  }
+
+  /**
    * Create a TransformStream for monitoring LLM output.
    *
    * Use with Vercel AI SDK's `experimental_transform` option on `streamText()`.
@@ -354,6 +413,11 @@ export class Aegis {
     const audit = this.audit;
     const mode = options.mode ?? "buffer";
     const maxBufferSize = options.maxBufferSize ?? 64 * 1024; // 64 KiB default cap
+    // Capture the budget handles by closure — the TransformStream's `flush`
+    // lambda needs to read and increment these without aliasing `this`.
+    const judgeCallBudget = this.judgeCallBudget;
+    const getCallsUsed = (): number => this.judgeCallsUsed;
+    const incrementCallsUsed = (): number => ++this.judgeCallsUsed;
 
     let buffer = "";
 
@@ -380,6 +444,49 @@ export class Aegis {
           return;
         }
 
+        // Short-circuit on open breaker / exhausted budget. Output-phase
+        // fallback is more conservative than input-phase: the model has
+        // ALREADY produced output, so "fail-open" means serving that
+        // output unjudged. Callers pick the tradeoff via onBreakerOpen.
+        const breakerState = judge.getBreakerState();
+        const budgetExhausted =
+          judgeCallBudget > 0 && getCallsUsed() >= judgeCallBudget;
+
+        if (breakerState === "open" || budgetExhausted) {
+          const fallback = judge.getBreakerFallback();
+          audit.log({
+            event: "judge_evaluation",
+            decision: fallback === "fail-closed" ? "blocked" : "allowed",
+            context: {
+              phase: "output",
+              judgeSkipped: true,
+              skipReason: budgetExhausted ? "budget_exhausted" : "breaker_open",
+              breakerState,
+              breakerFallback: fallback,
+              outputLength: buffer.length,
+              mode,
+              judgeCallsUsed: getCallsUsed(),
+              judgeCallBudget,
+            },
+          });
+          if (fallback === "fail-closed") {
+            if (mode === "buffer") {
+              controller.enqueue(
+                `[aegis: output withheld — judge unavailable and fail-closed configured]`,
+              );
+            } else {
+              controller.enqueue(
+                `\n[aegis: judge unavailable; output emitted under fail-closed unreviewed]`,
+              );
+            }
+          } else {
+            // scanner / fail-open → emit the buffered content
+            if (mode === "buffer") controller.enqueue(buffer);
+          }
+          return;
+        }
+
+        const callNumber = incrementCallsUsed();
         const verdict = await judge.evaluate(userRequest, buffer);
 
         audit.log({
@@ -393,6 +500,8 @@ export class Aegis {
             executionTimeMs: verdict.executionTimeMs,
             outputLength: buffer.length,
             mode,
+            breakerState,
+            judgeCallsUsed: callNumber,
           },
         });
 

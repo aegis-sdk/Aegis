@@ -66,7 +66,46 @@ export interface LLMJudgeConfig {
    * Takes a prompt string, returns the raw model response as a string.
    */
   llmCall: LLMJudgeCallFn;
+
+  /**
+   * Circuit-breaker configuration. Protects the app when the judge
+   * provider is degraded: after N consecutive failures, the breaker opens
+   * and subsequent grey-band decisions fall back to the policy set by
+   * `onBreakerOpen` below until a cooldown passes. Without this, a
+   * 5-minute provider outage would stall every request.
+   */
+  circuitBreaker?: CircuitBreakerConfig;
+
+  /**
+   * What to do with a grey-band input when the circuit breaker is open.
+   *   "scanner"    — trust the scanner's verdict (it said unsafe → block,
+   *                   it said safe → pass). Recommended default.
+   *   "fail-open"  — approve the input. Use only if latency is the top
+   *                   priority and the scanner already caught the worst.
+   *   "fail-closed"— block the input. Use when the cost of a missed
+   *                   attack is higher than the cost of a false positive.
+   *
+   * Default: `"scanner"`.
+   */
+  onBreakerOpen?: "scanner" | "fail-open" | "fail-closed";
 }
+
+/**
+ * Circuit breaker settings. After `threshold` consecutive judge-call
+ * failures the breaker opens. While open, `classify()` returns the
+ * breaker-open fallback and `evaluate*()` skip the LLM call entirely.
+ * After `cooldownMs` the breaker transitions to HALF-OPEN and the next
+ * call probes the provider; success resets the breaker, failure opens
+ * it again.
+ */
+export interface CircuitBreakerConfig {
+  /** Consecutive failures before opening. Default: 5 */
+  threshold?: number;
+  /** How long to stay open before probing again, in ms. Default: 30_000 */
+  cooldownMs?: number;
+}
+
+export type CircuitBreakerState = "closed" | "open" | "half-open";
 
 /**
  * The structured verdict returned by the LLM-Judge after evaluating
@@ -186,6 +225,9 @@ Be conservative: when uncertain, flag rather than approve.`;
  */
 export type BandDecision = "pass" | "judge" | "block";
 
+const DEFAULT_BREAKER_THRESHOLD = 5;
+const DEFAULT_BREAKER_COOLDOWN_MS = 30_000;
+
 export class LLMJudge {
   private readonly enabled: boolean;
   private readonly band: JudgeBand;
@@ -193,6 +235,18 @@ export class LLMJudge {
   private readonly systemPrompt: string;
   private readonly inputSystemPrompt: string;
   private readonly llmCall: LLMJudgeCallFn;
+
+  // Circuit breaker state
+  private readonly breakerThreshold: number;
+  private readonly breakerCooldownMs: number;
+  private readonly breakerFallback: "scanner" | "fail-open" | "fail-closed";
+  private consecutiveFailures = 0;
+  private breakerOpenedAt: number | null = null;
+
+  // Latency telemetry — rolling samples for p50/p95/p99.
+  // Kept bounded so memory doesn't grow unbounded across session lifetime.
+  private readonly latencySamples: number[] = [];
+  private static readonly MAX_LATENCY_SAMPLES = 256;
 
   constructor(config: LLMJudgeConfig) {
     this.enabled = config.enabled ?? true;
@@ -211,6 +265,67 @@ export class LLMJudge {
     this.systemPrompt = config.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
     this.inputSystemPrompt = DEFAULT_INPUT_SYSTEM_PROMPT;
     this.llmCall = config.llmCall;
+
+    this.breakerThreshold = config.circuitBreaker?.threshold ?? DEFAULT_BREAKER_THRESHOLD;
+    this.breakerCooldownMs = config.circuitBreaker?.cooldownMs ?? DEFAULT_BREAKER_COOLDOWN_MS;
+    this.breakerFallback = config.onBreakerOpen ?? "scanner";
+  }
+
+  /**
+   * Return the breaker's current state. Useful for health checks and
+   * surfacing a status indicator in dashboards.
+   */
+  getBreakerState(): CircuitBreakerState {
+    if (this.breakerOpenedAt === null) return "closed";
+    if (Date.now() - this.breakerOpenedAt >= this.breakerCooldownMs) return "half-open";
+    return "open";
+  }
+
+  /**
+   * Breaker-open fallback policy — what happens to a grey-band decision
+   * when the judge provider is degraded.
+   */
+  getBreakerFallback(): "scanner" | "fail-open" | "fail-closed" {
+    return this.breakerFallback;
+  }
+
+  /**
+   * Latency statistics for recent judge calls (bounded rolling window).
+   * Returns zeros when no samples have been collected yet.
+   */
+  getLatencyStats(): { count: number; mean: number; p50: number; p95: number; p99: number } {
+    if (this.latencySamples.length === 0) {
+      return { count: 0, mean: 0, p50: 0, p95: 0, p99: 0 };
+    }
+    const sorted = [...this.latencySamples].sort((a, b) => a - b);
+    const sum = sorted.reduce((acc, v) => acc + v, 0);
+    const pick = (p: number): number => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0;
+    return {
+      count: sorted.length,
+      mean: sum / sorted.length,
+      p50: pick(0.5),
+      p95: pick(0.95),
+      p99: pick(0.99),
+    };
+  }
+
+  private recordLatency(ms: number): void {
+    this.latencySamples.push(ms);
+    if (this.latencySamples.length > LLMJudge.MAX_LATENCY_SAMPLES) {
+      this.latencySamples.shift();
+    }
+  }
+
+  private onJudgeSuccess(): void {
+    this.consecutiveFailures = 0;
+    this.breakerOpenedAt = null;
+  }
+
+  private onJudgeFailure(): void {
+    this.consecutiveFailures++;
+    if (this.consecutiveFailures >= this.breakerThreshold) {
+      this.breakerOpenedAt = Date.now();
+    }
   }
 
   /**
@@ -298,15 +413,33 @@ export class LLMJudge {
       };
     }
 
+    // Circuit breaker: when OPEN, skip the LLM call entirely and report
+    // a "flagged" verdict with the breaker-fallback reasoning. Aegis's
+    // orchestrator can then apply the configured fallback policy.
+    const breakerState = this.getBreakerState();
+    if (breakerState === "open") {
+      return {
+        approved: false,
+        confidence: 0.0,
+        decision: "flagged",
+        reasoning: "Judge circuit breaker is open — provider degraded, fallback engaged.",
+        executionTimeMs: 0,
+      };
+    }
+
     const startTime = Date.now();
 
     try {
       const prompt = this.buildInputPrompt(userInput, context);
       const rawResponse = await this.callWithTimeout(prompt);
       const elapsed = Date.now() - startTime;
+      this.recordLatency(elapsed);
+      this.onJudgeSuccess();
       return this.parseResponse(rawResponse, elapsed);
     } catch (error: unknown) {
       const elapsed = Date.now() - startTime;
+      this.recordLatency(elapsed);
+      this.onJudgeFailure();
       const message =
         error instanceof Error ? error.message : "Unknown error during judge input evaluation";
       return {
@@ -334,16 +467,34 @@ export class LLMJudge {
       };
     }
 
+    // Circuit breaker: when OPEN, skip the LLM call. Output-phase verdict
+    // defaults to flagged so the orchestrator's breaker-fallback policy
+    // applies instead of an unreliable approve.
+    const breakerState = this.getBreakerState();
+    if (breakerState === "open") {
+      return {
+        approved: false,
+        confidence: 0.0,
+        decision: "flagged",
+        reasoning: "Judge circuit breaker is open — provider degraded, fallback engaged.",
+        executionTimeMs: 0,
+      };
+    }
+
     const startTime = Date.now();
 
     try {
       const prompt = this.buildPrompt(userRequest, modelOutput, context);
       const rawResponse = await this.callWithTimeout(prompt);
       const elapsed = Date.now() - startTime;
+      this.recordLatency(elapsed);
+      this.onJudgeSuccess();
 
       return this.parseResponse(rawResponse, elapsed);
     } catch (error: unknown) {
       const elapsed = Date.now() - startTime;
+      this.recordLatency(elapsed);
+      this.onJudgeFailure();
 
       // Timeout or other errors — fall back to flagged
       const message =

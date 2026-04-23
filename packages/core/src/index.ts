@@ -48,6 +48,10 @@ export {
   parseSimpleYaml,
 } from "./policy/index.js";
 
+// ─── Presets ─────────────────────────────────────────────────────────────────
+export { productionPreset } from "./presets/index.js";
+export type { ProductionPresetOptions } from "./presets/index.js";
+
 // ─── Utilities ───────────────────────────────────────────────────────────────
 export { normalizeEncoding, tryDecodeBase64 } from "./scanner/encoding.js";
 export { shannonEntropy, analyzeEntropy } from "./scanner/entropy.js";

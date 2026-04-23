@@ -765,6 +765,15 @@ export interface AegisConfig {
   multiModal?: MultiModalConfig;
   /** LLM-Judge configuration for intent alignment verification */
   judge?: LLMJudgeConfig;
+  /**
+   * Per-instance cap on the number of judge calls Aegis will make. Once the
+   * cap is reached, subsequent grey-band decisions fall back to the judge's
+   * breaker-fallback policy (same as if the breaker were open). Applies to
+   * both input- and output-phase judge invocations. Not enforced when
+   * omitted or set to 0. Useful as a last-mile budget guard in production
+   * so a runaway workload cannot burn through an API budget unnoticed.
+   */
+  judgeCallBudget?: number;
 }
 
 export interface RecoveryConfig {
