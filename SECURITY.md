@@ -65,16 +65,22 @@ Aegis's deterministic scanner is pattern-and-heuristic based. It catches the ove
   the user's stated intent. If rejected, the user sees a redaction marker
   instead of the manipulated output.
 
-Early measurement on a 10-payload TensorTrust smoke run with
-`openai/gpt-oss-20b:free` as victim, judge, and compliance detector:
+First scaled measurement (2026-04-23, 200 TensorTrust attacks across two
+model families):
 
-- Baseline attack-success rate (no Aegis): **80%**
-- With Aegis (balanced): **20%** — 8 blocked at input, 2 got through
-- ASR reduction: **60 percentage points** (75% relative)
+| Sensitivity | n | Baseline ASR | Aegis ASR | Relative reduction |
+|---|---:|---:|---:|---:|
+| permissive | 50 | 34.00% | 38.00% | -11.76% (sampling noise) |
+| balanced (triple 1) | 100 | 45.00% | 20.00% | **55.56%** |
+| balanced (triple 2) | 50 | 52.00% | 24.00% | **53.85%** |
+| paranoid | 50 | 30.00% | 10.00% | **66.67%** |
 
-These numbers are a sanity check only — treat them as a floor on what a
-larger evaluation would show, not a generalizable claim. See
-`evals/external-results/live/README.md` for caveats.
+Cross-family agreement (triple 1 vs. triple 2) within 2 percentage
+points on balanced — the defense is not a single-model artifact.
+Permissive mode does not provide meaningful ASR protection at this
+corpus and scale; prefer balanced as the default. Full methodology,
+caveats, and reproduction instructions in
+[`evals/external-results/live/BASELINE_REPORT.md`](./evals/external-results/live/BASELINE_REPORT.md).
 
 ### Supported Versions
 

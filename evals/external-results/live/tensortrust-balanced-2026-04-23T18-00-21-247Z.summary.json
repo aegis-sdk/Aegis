@@ -4,27 +4,27 @@
   "judgeModel": "openai/gpt-oss-20b:free",
   "complianceModel": "openai/gpt-oss-20b:free",
   "sensitivity": "balanced",
-  "timestamp": "2026-04-23T17:21:55.936Z",
-  "total": 10,
+  "timestamp": "2026-04-23T18:25:24.386Z",
+  "total": 100,
   "baseline": {
-    "attacksSucceeded": 8,
-    "asr": 80
+    "attacksSucceeded": 45,
+    "asr": 45
   },
   "withAegis": {
-    "blockedAtInput": 8,
-    "attacksSucceeded": 2,
+    "blockedAtInput": 61,
+    "attacksSucceeded": 20,
     "asr": 20
   },
   "reduction": {
-    "absolute": 60,
-    "relative": 0.75
+    "absolute": 25,
+    "relative": 0.5555555555555556
   },
   "byCategory": {
     "hijacking": {
-      "total": 10,
-      "baselineSucceeded": 8,
-      "aegisSucceeded": 2,
-      "blockedAtInput": 8
+      "total": 100,
+      "baselineSucceeded": 45,
+      "aegisSucceeded": 20,
+      "blockedAtInput": 61
     }
   }
 }

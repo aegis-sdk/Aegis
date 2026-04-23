@@ -42,3 +42,4 @@ evals/external-results/raw/
 # Live-eval per-payload outcome streams contain full attacker payloads;
 # keep them local. Summary JSONs (aggregated numbers only) are checked in.
 evals/external-results/live/*.jsonl
+.claude/
